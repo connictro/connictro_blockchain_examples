@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 "use strict";
+const API_REFRESH_BEFORE_EXPIRE_MILLISECONDS = 30000;
 
 /* ===============================================================================================
  * Connictro Blockchain service API handling
@@ -49,6 +50,27 @@ function doSignin(_server, _clientKey, _encHash, _clientCertificate){
       error: function (response) {
           //console.log(response);
           //console.log("Resolving doSignin (failure)");
+          reject(null);
+      }
+    });
+  });
+}
+
+function doSigninRefresh(_server, _refreshToken){
+  return new Promise((resolve, reject) => {
+    //console.log("Entering doSigninRefresh, URL: " + _server + "'/cbv1/mos/signin?refreshToken=" + _refreshToken);
+    $.ajax({
+      type: 'post',
+      url: _server + '/cbv1/mos/signin?refreshToken=' + _refreshToken,
+      contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+      success: function (response) {
+          //console.log(response);
+          //console.log("Resolving doSigninRefresh (success)");
+          resolve(response);
+      },
+      error: function (response) {
+          //console.log(response);
+          //console.log("Resolving doSigninRefresh (failure)");
           reject(null);
       }
     });
@@ -171,6 +193,39 @@ function updateOwnMoRaw(_ck, _queryParams, _asset, _requestBodyStr){
  * All-in-one helper functions
  * ===============================================================================================
  */
+ 
+/* Just sign in without reading MO (for web auth demo), in credentials and refreh versions. */
+async function doJustSignin(_successCallback, _failureCallback, _server, _clientKey, _encHash, _clientCertificate){
+  //console.log("Entering doJustSignin");
+  var _ck;
+  try {
+    _ck = await doSignin(_server, _clientKey, _encHash, _clientCertificate);
+    //console.log("Sign in successful");
+  } catch (err) {
+    //console.log("Leaving doJustSignin (promise failed)");
+    _failureCallback();
+    return;
+  }  
+  //console.log("Leaving doJustSignin, dumping _ck:");
+  //console.log(_ck)
+  _successCallback(_ck);
+}
+
+async function doJustSigninRefresh(_successCallback, _failureCallback, _server, _refreshToken){
+  //console.log("Entering doJustSigninRefresh");
+  var _ck;
+  try {
+    _creds = await doSigninRefresh(_server, _refreshToken);
+    //console.log("Sign in successful");
+  } catch (err) {
+    //console.log("Leaving doJustSigninRefresh (promise failed)");
+    _failureCallback();
+    return;
+  }  
+  //console.log("Leaving doJustSigninRefresh, dumping _creds:");
+  //console.log(_creds)
+  _successCallback(_creds);
+} 
 
 /* All-in-one for just reading: Sign in, read own MO fields + assets (with or without history)
  * NOTE: For this demo we always do a new signin. To optimize performance for a real application
@@ -504,6 +559,21 @@ function decodeTimebombArray(_timebombArray, _lang){
   return timersInfoStr;
 }
 
+/* Check token expiration time. If expiration is more than 30 seconds in the future
+ * return true, false otherwise.
+ */
+function checkTokenValid(atTime) {
+  var expireCheck = new Number(new Date(atTime));
+  var currentTime = new Number(Date.now());
+
+  //console.log("Expiration check: expires at " + expireCheck + " current time is " + currentTime);
+  if ((currentTime + API_REFRESH_BEFORE_EXPIRE_MILLISECONDS) < expireCheck){
+    return true;
+  }
+  return false;
+}
+
+
 /* ===============================================================================================
  * Other helpers
  * ===============================================================================================
@@ -547,4 +617,52 @@ var GetParams = (function () {
     });
     return get;
 })();
+
+function parseJsonWithDefault(_jsonStr){
+  var parseJson = (_jsonStr == null) ? "{}" : ((_jsonStr == "") ? "{}" : _jsonStr);
+  return JSON.parse(parseJson);
+}
+
+function parseJsonWithDefaultCatchingErrors(_jsonStr){
+  return new Promise((resolve, reject) => {
+    try {
+      var _parsed = parseJsonWithDefault(_jsonStr);
+      resolve(_parsed);
+    } catch (err){
+      reject(null);
+    }
+  });
+}
+
+var mFileOpenCallback = null;
+
+async function openLocalFile(_filesObj, _fileCallback){
+  //console.log("Entering openLocalFile, files object:");
+  //console.log(_filesObj);
+  var file, fr;
+  mFileOpenCallback = null;
+
+  if (!window.File || !window.FileReader || !window.FileList || !window.Blob){
+    alert("This browser is not supporting file API!");
+    return;
+  }
+
+  if (_filesObj.length == 0){
+    alert("File is empty");
+    return;
+  }
+  mFileOpenCallback = _fileCallback;
+
+  file = _filesObj[0];
+
+  if (file != null){
+    fr = new FileReader();
+    fr.onload = function(e) {
+      var _rawFile = e.target.result;
+      mFileOpenCallback(_rawFile);
+    };
+    fr.readAsText(file);
+  }
+  //console.log("Leaving openLocalFile");
+}
 

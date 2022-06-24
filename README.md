@@ -11,7 +11,7 @@ like e-mail address, phone number, credit card number etc. is needed.
 
 Each MO consists of fields (from simple text fields of up to 4KB, to fields controlling MO behaviour),
 and assets (similar to "money" or "fuel"). End user assets (the digital twin of a permit or voucher) can
-only be consumed, never transferred to others.  
+only be consumed, never transferred to others.
 The most important (and predefined) assets are "life" (mandatory) and "value" (optional).
 
 "Life" models the state of the MO (counting down from 7 to 0; states may be skipped).

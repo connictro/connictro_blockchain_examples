@@ -228,7 +228,7 @@ async function printMoResult(_ck){
   //console.log(_ck);
   if (_ck.moFields.moTier != 255){
      // allow only endusers for this demo.
-     writeToMain("<h3>MO read OK but only endusers allowed!</h3>");
+     writeToMain((gLanguage == "de") ? "<h3>MO Lesen erfolgreich, aber es sind nur Enduser erlaubt!</h3>" :"<h3>MO read OK but only endusers allowed!</h3>");
   } else {
     var _exampleTitle = (_ck.moFields.customId == null) ? ((gLanguage == "de") ? "Erlaubnis" : "Permit") : _ck.moFields.customId;  
     var _state = extractBalance(_ck, "life");
