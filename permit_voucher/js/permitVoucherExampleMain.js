@@ -237,10 +237,7 @@ async function printMoResult(_ck){
     if (_state == null){
       var _htmlFullMessage = (gLanguage == "de") ? "<h3>Ausgew&auml;hltes MO ist ung&uuml;ltig (ohne Leben)!</h3>" : "<h3>Selected MO is invalid (no life)!</h3>";
     } else {
-      var _licenseText     = (gLanguage == "de") ?
-                              ((_state > 3) ? _exampleTitle + " noch nicht aktiv" + ((_state >= 7) ? "" : " (bereitgestellt)") : (_state < 3) ? _exampleTitle + " abgelaufen!" : _exampleTitle + " g&uuml;ltig!") :
-                              ((_state > 3) ? _exampleTitle + " not yet active" + ((_state >= 7) ? "" : " (provisioned)") : (_state < 3) ? _exampleTitle + " expired!" : _exampleTitle + " valid!");
-      var _htmlMoHeading   = "<h3>" + _licenseText + "</h3>";
+      var _htmlMoHeading   = "<h3>" + _exampleTitle + " " + verboseLifeState(_state, gLanguage) + "!</h3>";
       var _htmlValueInformation = "";
       var _balance = extractBalance(_ck, "value");
       var _mustDisplayHistoryButtons = false;

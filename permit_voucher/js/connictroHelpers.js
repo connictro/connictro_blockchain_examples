@@ -18,6 +18,9 @@
 "use strict";
 const API_REFRESH_BEFORE_EXPIRE_MILLISECONDS = 30000;
 
+const life_states_de = ["ung&uuml;ltig", "zur&uuml;ckgegeben", "abgelaufen", "g&uuml;ltig!", "wartet auf Pairing", "wartet auf Validierung", "noch nicht aktiv (bereitgestellt)", "noch nicht aktiv"];
+const life_states_en = ["invalid", "returned", "expired", "valid", "waiting for pairing", "waiting for validation", "not yet active (provisioned)", "not yet active"];
+
 /* ===============================================================================================
  * Connictro Blockchain service API handling
  * ===============================================================================================
@@ -676,6 +679,13 @@ function parseJsonWithDefaultCatchingErrors(_jsonStr){
       reject(null);
     }
   });
+}
+
+function verboseLifeState(_state, _lang){
+  if (_state > 7){
+    return (_lang == "de") ? "genug" : "sufficient";
+  }
+  return (_lang == "de") ? life_states_de[_state] : life_states_en[_state];
 }
 
 var mFileOpenCallback = null;

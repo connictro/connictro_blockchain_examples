@@ -1,32 +1,32 @@
 /*
  * Connictro Blockchain - Company Internal Use Example
- * 
+ *
  * This module displays a created end-user object with the purpose of booking hours for different projects.
  * This is typically used within R&D of companies or by consultants reporting to their principal.
  * Simplest way to do so would be a spreadsheet, but this is not fraud proof. Using Connictro Blockchain
  * instead, stores the time records in the fraud-proof distributed database.
- * 
+ *
  * It allows to add projects, and for all projects added so far, a drop-down list for actual booking of time
  * to projects is displayed.
- * 
+ *
  * It displays current status - which project currently working on (if any) and presents the appropriate options
  * (start/change or stop current project).
  * A report of work performed so far can be showm, which uses the DataTables component.
  * Reports can be exported to clipboard, CSV file, Excel [LibreOffice will work as well], PDF or sent to printer.
- * 
+ *
  * The demo accepts Connictro Blockchain credentials as URL parameters
  * (clientKey abbreviated as k, encHash abbreviated as e, clientCertificate abbreviated as c -
  *  in order not to add too much redundant info to the QR code)
- * 
- * Furthermore parameter 'd' denotes blockchain (can be A, B or P for development A/B or production). If not given, A is assumed. 
+ *
+ * Furthermore parameter 'd' denotes blockchain (can be A, B or P for development A/B or production). If not given, A is assumed.
  * Optionally parameter 'l' denotes language (currently just 'de' is detected - switches to German, everything else is displayed as English.)
  *
- * Example: 
+ * Example:
  * https:<server>/companyInternalExample.html?d=A&k=<insert your clientKey here>&e=<insert your encHash here>&c=<insert your clientCertificate here>
- * 
  *
- * Copyright (C) 2022 Connictro GmbH 
- * 
+ *
+ * Copyright (C) 2022 Connictro GmbH
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -48,12 +48,12 @@ const CHAIN_PORT_B = 58082; // For B development chain (reset Feb-Apr-Jun-Aug-Oc
 const SIGNIFICANT_TIME_DIFF = 60000; // significant time deltas are minutes. We don't care about anything less than a minute.
 const exportFilenameBase = "Connictro_Blockchain_Example-Work_history_of_";
 
-                            
+
 const DEV_NODE_LIST = [
         "https://node1.connictro-blockchain.de:",
         "https://node2.connictro-blockchain.de:",
         "https://node3.connictro-blockchain.de:"
-        ]        
+        ]
 const PROD_NODE_LIST = [
         "https://node1.connictro-blockchain.de:",
         "https://node2.connictro-blockchain.de:",
@@ -61,8 +61,8 @@ const PROD_NODE_LIST = [
         "https://node4.connictro-blockchain.de:",
         "https://node5.connictro-blockchain.de:"
         ]
-        
-const BALANCE_WARNING = 100;                
+
+const BALANCE_WARNING = 100;
 var gRandNode = null;
 var gShowingReport = false;
 var gLanguage;
@@ -76,13 +76,13 @@ var gProjects;
  * Chain services development A/B and production run on these nodes but on different ports.
  */
 function chooseNode(_chain){
-  var _nodeList = (_chain == 'P' || _chain == 'p') ? PROD_NODE_LIST : DEV_NODE_LIST; 
+  var _nodeList = (_chain == 'P' || _chain == 'p') ? PROD_NODE_LIST : DEV_NODE_LIST;
   var _numNodes = _nodeList.length;
   if (gRandNode == null){
     gRandNode = Math.floor(Math.random() * _numNodes);
   }
-  var _chainPort = (_chain == 'P' || _chain == 'p') ? CHAIN_PORT_P: ((_chain == 'a' || _chain == 'A') ? CHAIN_PORT_A: CHAIN_PORT_B);  
-  
+  var _chainPort = (_chain == 'P' || _chain == 'p') ? CHAIN_PORT_P: ((_chain == 'a' || _chain == 'A') ? CHAIN_PORT_A: CHAIN_PORT_B);
+
   return (_nodeList[gRandNode] + _chainPort);
 }
 
@@ -92,16 +92,16 @@ function parseUrlParametersAndChooseNode(){
   var clientCertParam = GetParams['c'];
   var encHashParam = GetParams['e'];
   var devChain = GetParams['d'];
-  gLanguage = GetParams['l'];  
-    
+  gLanguage = GetParams['l'];
+
   if (clientKeyParam == undefined || clientCertParam == undefined || encHashParam == undefined || devChain == undefined){
     var invalid_param_msg = (gLanguage == "de") ?
-                              "<h3>Ung&uuml;ltige Parameter</h3>Bitte angeben: d (Demo Blockchain A oder B), e (encHash), k (clientKey) und c (clientCertificate)!</h3>" :  
-                              "<h3>Invalid Parameters</h3>Must specify d (chain A or B), e (encHash), k (clientKey) and c (clientCertificate)!</h3>";  
+                              "<h3>Ung&uuml;ltige Parameter</h3>Bitte angeben: d (Demo Blockchain A oder B), e (encHash), k (clientKey) und c (clientCertificate)!</h3>" :
+                              "<h3>Invalid Parameters</h3>Must specify d (chain A or B), e (encHash), k (clientKey) and c (clientCertificate)!</h3>";
     writeToMain(invalid_param_msg);
     return null;
   }
-    
+
   var _chosenChain = null;
   if (devChain != null && (devChain != 'a' && devChain != 'A')){
     _chosenChain = 'B';
@@ -109,13 +109,13 @@ function parseUrlParametersAndChooseNode(){
     _chosenChain = 'A';
   }
   var chosenServer = chooseNode(_chosenChain);
-    
-  var _signinCreds = { 
+
+  var _signinCreds = {
               clientKey: clientKeyParam,
               clientCertificate: clientCertParam,
               encHash: encHashParam,
               server: chosenServer
-            }     
+            }
   //console.log("Leaving parseUrlParametersAndChooseNode");
   return _signinCreds;
 }
@@ -125,7 +125,7 @@ function mainMoDisplay(){
   //console.log("Entering mainMoDisplay");
   var _signinCreds = parseUrlParametersAndChooseNode();
   if (_signinCreds == null) return;
-  
+
   var _ck = doSigninAndReadMo(printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);
   if (_ck == null){
     var unable_read_msg = (gLanguage == "de") ? "<h3>MO nicht zugreifbar!</h3>" : "<h3>Unable to read MO!</h3>";
@@ -135,12 +135,12 @@ function mainMoDisplay(){
 }
 
 function printMoFailure(){
-  var signinfail = (gLanguage == "de") ? "<h3>Fehler: Login fehlgeschlagen!</h3>" : "<h3>Error: Sign-in failed!</h3>"; 
+  var signinfail = (gLanguage == "de") ? "<h3>Fehler: Login fehlgeschlagen!</h3>" : "<h3>Error: Sign-in failed!</h3>";
   writeToMain(signinfail);
 }
 
 function modifyMoFailure(){
-  var modifyfail = (gLanguage == "de") ? "<h3>Fehler: MO-&Auml;nderung fehlgeschlagen!</h3>" : "<h3>Error: MO change failed!</h3>"; 
+  var modifyfail = (gLanguage == "de") ? "<h3>Fehler: MO-&Auml;nderung fehlgeschlagen!</h3>" : "<h3>Error: MO change failed!</h3>";
   writeToMain(modifyfail);
 }
 
@@ -150,11 +150,11 @@ async function addProject(_ck){
 
   var project_name = $('#addProjectName').val();
   var _projectsFileList = [];
-  try {       
+  try {
     var _projectsFileObj = await parseJsonWithDefaultCatchingErrors(_ck.moFields.customPayload);
     if (_projectsFileObj.ListOfProjects){
-      _projectsFileList = _projectsFileObj.ListOfProjects; 
-    }           
+      _projectsFileList = _projectsFileObj.ListOfProjects;
+    }
   } catch(err) {
     // any error means no projects.
   }
@@ -163,8 +163,8 @@ async function addProject(_ck){
   var _projectsObj = {
     ListOfProjects: _projectsFileList
   }
-  var _serializedProjectsList = JSON.stringify(_projectsObj);    
-  doModifyField("#waitMsg", "customPayload", _serializedProjectsList, mainMoDisplay, modifyMoFailure, _ck, gLanguage);    
+  var _serializedProjectsList = JSON.stringify(_projectsObj);
+  doModifyField("#waitMsg", "customPayload", _serializedProjectsList, mainMoDisplay, modifyMoFailure, _ck, gLanguage);
   //console.log("Leaving addProject");
 }
 
@@ -172,9 +172,17 @@ async function handleAddProjectEntry(){
   //console.log("Entering handleAddProjectEntry");
   var _signinCreds = parseUrlParametersAndChooseNode();
   if (_signinCreds == null) return;
-  
+
   var _ck = doSigninAndReadMo(addProject, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);
   //console.log("Leaving handleAddProjectEntry");
+}
+
+function retrieveBookingHistory(_ck){
+  var _booking_history = extractHistory(_ck, "value");
+  if (_booking_history === undefined || _booking_history == null ){
+    _booking_history = [];
+  }
+  return _booking_history;
 }
 
 /* Checks last history entry (if any) about:
@@ -186,14 +194,23 @@ async function checkProjectRunning(_ck){
   //console.log("Entering checkProjectRunning");
 
   // look into history if there is an unfinished booking.
-  var _booking_history = extractHistory(_ck, "value");
-  if (_booking_history === undefined || _booking_history == null ){
-    _booking_history = [];
+  var _booking_history;
+  try {
+    _booking_history = await retrieveBookingHistory(_ck);
+  } catch (err){
+    // any error means we experienced a low-level error on identifying the booking history. Return an empty history.
+    console.log("checkProjectRunning: Early error reading the booking history!");
+    return {
+       history_len: 0,
+       is_stopped: true,
+       last_project: "",
+       last_time: 0
+    }
   }
 
   var last_stopped = true; // assume no running project
   var last_started_project = "";
-  var last_timestamp = ""; 
+  var last_timestamp = "";
   if (_booking_history.length > 0){
     var last_entry = _booking_history[_booking_history.length-1];
     var last_tx_str = last_entry.transactionRecord;
@@ -213,19 +230,19 @@ async function checkProjectRunning(_ck){
             break;
           }
         }
-      }           
+      }
     } catch(err) {
       // any error means no readable time booking entry. Stop here with the assumption that there is no running project.
     }
   }
 
-  var numerical_last_time = new Number(new Date(last_timestamp));  
+  var numerical_last_time = new Number(new Date(last_timestamp));
   var retobj = {
     history_len: _booking_history.length,
     is_stopped: last_stopped,
     last_project: last_started_project,
-    last_time: numerical_last_time 
-  };  
+    last_time: numerical_last_time
+  };
 
   //console.log("Leaving checkProjectRunning");
   return retobj;
@@ -237,26 +254,26 @@ function calculateStopTimeRecord(last_entry_examined){
   var stop_record = {
       pid: last_entry_examined.last_project,
       st: false
-    }; 
+    };
 
-  /* Only if specific stop time is selected, take the time 
+  /* Only if specific stop time is selected, take the time
    * entered into the widget and write it as stop time into the stop time record.
    */
   var stoptime_checked = $('#selectedStopTime').prop('checked');
   if (stoptime_checked){
     var _specified_stop_time = readTimeNumerical("stopTime");
-    var stop_iso_time_str = new Date(_specified_stop_time)    
+    var stop_iso_time_str = new Date(_specified_stop_time)
     stop_record.time = stop_iso_time_str.toISOString();
   }
 
   //console.log("Leaving calculateStopTimeRecord");
-  return stop_record;    
+  return stop_record;
 }
 
 
 async function writeBookingRecord(_ck, booking_record){
   //console.log("Entering writeBookingRecord");
-  
+
   var serialized_booking_record = JSON.stringify(booking_record);
   var _signinCreds = parseUrlParametersAndChooseNode();
 
@@ -264,11 +281,11 @@ async function writeBookingRecord(_ck, booking_record){
     await doBurnAsset("#waitMsg", "value", serialized_booking_record, _ck, gLanguage, true);
     // Need to re-read assets to update in _ck object
     await readOwnMoAssetsRaw(_ck, true);
-    //console.log("Read assets successful");        
+    //console.log("Read assets successful");
     printMoResult(_ck);
   } catch (err){
     modifyMoFailure();
-  } 
+  }
 
   //console.log("Leaving writeBookingRecord");
 }
@@ -286,8 +303,8 @@ async function startBookingWorker(_ck){
   var opt_comment = $("#optComment").val();
   if (opt_comment){
     start_record.comment = opt_comment;
-  }  
-  
+  }
+
   if (last_entry_examined.is_stopped){
     // no unfinished booking: Just write a start record.
     booking_record = { actions: [ start_record] };
@@ -295,11 +312,11 @@ async function startBookingWorker(_ck){
     // unfinished booking available
     if (last_entry_examined.last_project == new_project){
       // Trying to restart the same activity -> nothing to do
-      var nothing_running_msg = (_lang == "de") ? 
+      var nothing_running_msg = (_lang == "de") ?
                     "<h3 style=\"color:red;\">Projekt ist schon aktiv!</h3>" :
                     "<h3 style=\"color:red;\">Project already running!</h3>";
       $("#waitMsg").append(nothing_running_msg);
-      need_to_submit = false;      
+      need_to_submit = false;
     } else {
       // otherwise write a stop record for the unfinished project and a start record for the new one.
       var stop_record = calculateStopTimeRecord(last_entry_examined);
@@ -309,7 +326,7 @@ async function startBookingWorker(_ck){
     }
   }
   if (need_to_submit){
-    writeBookingRecord(_ck, booking_record);    
+    writeBookingRecord(_ck, booking_record);
   }
   //console.log("Leaving startBookingWorker");
 }
@@ -319,7 +336,7 @@ async function stopBookingWorker(_ck){
   var last_entry_examined = await checkProjectRunning(_ck); // look into history if there is an unfinished booking.
   if (last_entry_examined.is_stopped){
     // no running project: display message.
-    var nothing_running_msg = (_lang == "de") ? 
+    var nothing_running_msg = (_lang == "de") ?
                     "<h3 style=\"color:red;\">Keine laufendes zu buchendes Projekt!</h3>" :
                     "<h3 style=\"color:red;\">No running project to book!</h3>";
     $("#waitMsg").append(nothing_running_msg);
@@ -327,16 +344,16 @@ async function stopBookingWorker(_ck){
     var stop_record = calculateStopTimeRecord(last_entry_examined);
     var booking_record = {
       actions: [ stop_record ]
-    }         
-    writeBookingRecord(_ck, booking_record);    
+    }
+    writeBookingRecord(_ck, booking_record);
   }
   //console.log("Leaving stopBookingWorker");
 }
 
 function handleStartStopBooking(processingWorker){
-  //console.log("Entering handleStartStopBooking");  
+  //console.log("Entering handleStartStopBooking");
   var _signinCreds = parseUrlParametersAndChooseNode();
-  var _ck = doSigninAndReadMo(processingWorker, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);  
+  var _ck = doSigninAndReadMo(processingWorker, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);
   //console.log("Leaving handleStartStopBooking");
 }
 
@@ -346,15 +363,15 @@ function handleStopBooking() { handleStartStopBooking(stopBookingWorker);  }
 async function handleMoActivation(){
   //console.log("Entering handleMoActivation");
   var _signinCreds = parseUrlParametersAndChooseNode();
-  var activate_txrecord = (gLanguage == "de") ? "Demo MO-Aktivierung" : "Demo activate MO"; 
-  
+  var activate_txrecord = (gLanguage == "de") ? "Demo MO-Aktivierung" : "Demo activate MO";
+
   var _ck = doSigninConsumeAndReadMo("#waitMsg", "life", activate_txrecord, printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, gLanguage);
   if (_ck == null){
     var unable_status_msg = (gLanguage == "de") ? "<h3>Kann MO-Status nicht &auml;ndern!</h3>" : "<h3>Unable to change MO status!</h3>";
     writeToMain(unable_status_msg);
   } else {
     $("#waitMsg").empty();
-  }  
+  }
   //console.log("Leaving handleMoActivation");
 }
 
@@ -363,25 +380,25 @@ function displayReportButtons(){
   var _htmlReportButtons;
   if (gShowingReport){
     _htmlReportButtons = (gLanguage == "de") ?
-                          "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Auswertung aktualisieren</button>" +                                    
-                          "<button id=\"hideReport\" type=\"submit\" name=\"hideReport\">Auswertung verstecken</button>" :                                    
-                          "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Update report</button>" +                                    
-                          "<button id=\"hideReport\" type=\"submit\" name=\"hideReport\">Hide report</button>";                                    
+                          "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Auswertung aktualisieren</button>" +
+                          "<button id=\"hideReport\" type=\"submit\" name=\"hideReport\">Auswertung verstecken</button>" :
+                          "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Update report</button>" +
+                          "<button id=\"hideReport\" type=\"submit\" name=\"hideReport\">Hide report</button>";
   } else {
-    _htmlReportButtons = (gLanguage == "de") ? 
-                            "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Auswertung zeigen</button>" :                                    
-                            "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Show report</button>";                                    
+    _htmlReportButtons = (gLanguage == "de") ?
+                            "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Auswertung zeigen</button>" :
+                            "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Show report</button>";
   }
   writeToSection("reportButtons", _htmlReportButtons);
 
   $("#showReport").click(function (e) {
     e.preventDefault();
-    handleUpdateReport(); 
+    handleUpdateReport();
   });
 
   $("#hideReport").click(function (e) {
     e.preventDefault();
-    handleHideReport(); 
+    handleHideReport();
   });
   //console.log("Leaving displayReportButtons");
 }
@@ -403,11 +420,11 @@ async function handleUpdateReport(){
     writeToMain(unable_read_msg);
   }
   //console.log("Leaving handleUpdateReport");
-} 
+}
 
 async function extractReport(_ck, _assetname){
   //console.log("Entering extractReport");
- 
+
   var _interpreted_history = [];
   var _raw_booking_history = extractHistory(_ck, _assetname);
   if (_raw_booking_history === undefined || _raw_booking_history == null ){
@@ -428,21 +445,19 @@ async function extractReport(_ck, _assetname){
        * we can get start or stop events, or both. First extract all.
        */
       var cur_entry = _raw_booking_history[i];
-      var cur_tx_str = cur_entry.transactionRecord;
-      var cur_timestamp_blockchain = cur_entry.timestamp;
       var current_start_record = {
         pid: "",
         comment: "",
-        timestamp: cur_timestamp_blockchain        
+        timestamp: cur_entry.timestamp
       }
       var current_stop_record = {
         pid: "",
-        timestamp: cur_timestamp_blockchain        
+        timestamp: cur_entry.timestamp
       }
-      
+
       var _booking_obj;
       try {
-        var cur_tx_obj = await parseJsonWithDefaultCatchingErrors(cur_tx_str);
+        var cur_tx_obj = await parseJsonWithDefaultCatchingErrors(cur_entry.transactionRecord);
         if (cur_tx_obj.actions){
           var actionlist = cur_tx_obj.actions;
           for (var j=0;j<actionlist.length; j++){
@@ -450,7 +465,7 @@ async function extractReport(_ck, _assetname){
               current_start_record.pid = actionlist[j].pid;
               if (actionlist[j].comment !== undefined){
                 current_start_record.comment = actionlist[j].comment;
-              } 
+              }
             } else {
               current_stop_record.pid = actionlist[j].pid;
               if (actionlist[j].time !== undefined){
@@ -458,14 +473,13 @@ async function extractReport(_ck, _assetname){
                 current_stop_record.timestamp = actionlist[j].time;
               }
             }
-          }        
-        }      
+          }
+        }
       } catch (err){
-        console.log("Error in extractReport parsing JSON or after");
-        return []; // in case of errors return an empty report. 
+        console.log("Ignoring history entry " + i + " \"" + cur_entry.transactionRecord + "\", not a valid JSON");
       }
-      
-      /* Now we have a start record, a stop record - or both (identified by pid being not empty), 
+
+      /* Now we have a start record, a stop record - or both (identified by pid being not empty),
        * consisting of pid, timestamp (and in case of start record) optionally also a comment.
        *
        * If we have a stop record, process it first - look for a matching pending start record and create a new project time entry.
@@ -475,9 +489,9 @@ async function extractReport(_ck, _assetname){
           /* Create a new project time entry if a significant time (>= 1 minute) has been recorded.
            * It consists of: project ID - start time - stop time - spent time (in minutes) - comment (if any)
            */
-          var numerical_start_time = new Number(new Date(pending_project_record.timestamp)); 
+          var numerical_start_time = new Number(new Date(pending_project_record.timestamp));
           var numerical_stop_time = new Number(new Date(current_stop_record.timestamp));
-          var significant_timediff = ~~((numerical_stop_time - numerical_start_time)/SIGNIFICANT_TIME_DIFF); 
+          var significant_timediff = ~~((numerical_stop_time - numerical_start_time)/SIGNIFICANT_TIME_DIFF);
           if (significant_timediff > 0){
             var history_entry = {
               pid: current_stop_record.pid,
@@ -487,44 +501,30 @@ async function extractReport(_ck, _assetname){
               comment: pending_project_record.comment
             };
             _interpreted_history.push(history_entry);
-          
+
             pending_project_record = { // empty out the pending record.
               pid: "",
               comment: "",
               timestamp: ""
-            };          
+            };
 
-          }          
-        }  
+          }
+        }
       }
       // If we have a start record, update the pending record.
       if (current_start_record.pid){
-        pending_project_record.pid = current_start_record.pid; 
-        pending_project_record.timestamp = current_start_record.timestamp; 
-        pending_project_record.comment = current_start_record.comment; 
+        pending_project_record.pid = current_start_record.pid;
+        pending_project_record.timestamp = current_start_record.timestamp;
+        pending_project_record.comment = current_start_record.comment;
       }
     }
   }
-  
+
   //console.log("Leaving extractReport, dump of interpreted history object: ");
-  //console.log(_interpreted_history);  
+  //console.log(_interpreted_history);
   return _interpreted_history;
 }
 
-/* 
-
-- Zur Ermittlung der gearbeiteten Zeiten (Report-Generierung) muss ein Client die gesamte History auswerten und pro Projekt-ID die Differenz zwischen Start- und Stop-Tags ermitteln.
-- Output z.B. als Excel- oder CSV - siehe Dashboard UI (Datatables with pdfmake verwenden)
-- Als Begrenzung sollte Start- und Endezeit auswählbar sein (d.h. entweder "Monat" oder frei definierbarer Zeitraum)
-- Zeiträume müssen in Lokalzeit berechnet/ausgegeben werden (nicht UTC), bei Differenzen ist das egal!
-  
-  pro Tabellenzeile Detailansicht:  project ID - start time - stop time - spent time (in minutes) - comment (if any)
-
-  eine zweite Tabelle könnte dann noch die Gesamtsummen darstellen 
-  
-  Wir haben keine dynamischen Updates der Tabelle (wie im Dashboard UI)!
- */
- 
 function drawReportTableGrid(){
   const _htmlTableHeadings = (gLanguage == "de") ?
         "<th>Projekt</th>" +
@@ -538,7 +538,7 @@ function drawReportTableGrid(){
         "<th>Time worked</th>" +
         "<th>Comment</th>";
 
-  const _htmlDtReportTable = 
+  const _htmlDtReportTable =
     "<table id=\"reportTable\" class=\"row-border\" cellspacing=\"0\" width=\"100%\">" +
       "<thead>" +
         "<tr>" +
@@ -552,7 +552,7 @@ function drawReportTableGrid(){
 }
 
 function drawReportTable(processedReportData, exportFilenameBase, clientKey){
-  console.log("Entering drawReportTable");
+  //console.log("Entering drawReportTable");
 
   var _exportFilename = exportFilenameBase + clientKey;
   var data = [];
@@ -567,8 +567,6 @@ function drawReportTable(processedReportData, exportFilenameBase, clientKey){
       ];
     data.push(_entry);
   }
-  console.log("after creating data array, dump: ");
-  console.log(data);
   var searchterm = (gLanguage == "de") ? "Suchbegriff" : "Enter search term";
 
   var myReportTable = $('#reportTable');
@@ -617,16 +615,16 @@ async function printReportTable(_ck){
       $('#reportTable').DataTable().draw();
     } else {
       var _htmlOther = (gLanguage == "de") ? "<h3><b>Keine Arbeit aufgezeichnet!</b></h3>" : "<h3><b>No work recorded!</b></h3>";
-      writeToSection("reportSection", _htmlOther);    
+      writeToSection("reportSection", _htmlOther);
     }
   } catch (err) {
     var _htmlOther = (gLanguage == "de") ? "<h3><b>Fehler bei Reportgenerierung!</b></h3>" : "<h3><b>Error generating report!</b></h3>";
-    writeToSection("reportSection", _htmlOther);        
+    writeToSection("reportSection", _htmlOther);
   }
-  
+
 
   gShowingReport = true;
-  displayReportButtons();  
+  displayReportButtons();
   //console.log("Leaving printReportTable");
 }
 
@@ -634,66 +632,63 @@ function optionalStopTimeSelection(){
   var stoptime_checked = $('#selectedStopTime').prop('checked');
   if (stoptime_checked){
     $('#optionalStopTime').show();
-    var stopTimeWidget = document.getElementById('stopTime'); 
-    stopTimeWidget.value = getNowAsTimeDateString();  
+    var stopTimeWidget = document.getElementById('stopTime');
+    stopTimeWidget.value = getNowAsTimeDateString();
   } else {
-    $('#optionalStopTime').hide(); 
-  }     
+    $('#optionalStopTime').hide();
+  }
 }
-
 
 async function printMoResult(_ck){
   //console.log("Entering printMoResult");
   //console.log(_ck);
-  
+
   if (_ck.moFields.moTier != 255){
      // allow only endusers for this demo.
      writeToMain((gLanguage == "de") ? "<h3>MO Lesen erfolgreich, aber es sind nur Enduser erlaubt!</h3>" :"<h3>MO read OK but only endusers allowed!</h3>");
-  } else {    
+  } else {
     var _state = extractBalance(_ck, "life");
-    var _htmlFullMessage;    
+    var _htmlFullMessage;
     // Print message if we don't have life.
     if (_state == null){
-      _htmlFullMessage = (gLanguage == "de") ? "<h3>Ausgew&auml;hltes MO ist ung&uuml;ltig (ohne Leben)!</h3>" : "<h3>Selected MO is invalid (no life)!</h3>"; 
+      _htmlFullMessage = (gLanguage == "de") ? "<h3>Ausgew&auml;hltes MO ist ung&uuml;ltig (ohne Leben)!</h3>" : "<h3>Selected MO is invalid (no life)!</h3>";
     } else {
       var _exampleTitle = (gLanguage == "de") ? "Arbeitsaufzeichnungs-Objekt ist " : "Work records object is ";
-      var _licenseText     = (gLanguage == "de") ? 
-                              ((_state > 3) ? _exampleTitle + "noch nicht aktiv" + ((_state >= 7) ? "" : "(bereitgestellt)") : (_state < 3) ? _exampleTitle + "abgelaufen!" : _exampleTitle + "g&uuml;ltig!") :
-                              ((_state > 3) ? _exampleTitle + "not yet active" + ((_state >= 7) ? "" : "(provisioned)") : (_state < 3) ? _exampleTitle + "expired!" : _exampleTitle + "valid!");
-      var _htmlMoHeading   = "<h3>" + _licenseText + "</h3>";
+      var _htmlMoHeading   = "<h3>" + _exampleTitle + verboseLifeState(_state, gLanguage) + "!</h3>";
       var _htmlActivateButton = "";
       var _htmlBalanceWarning = "";
       var _htmlProjectActions = "";
-      var _htmlVacationActions = "";
-      const _htmlFinalWaitMsgSection = "<div id=\"waitMsg\"></div>"; 
+      const _htmlFinalWaitMsgSection = "<div id=\"waitMsg\"></div>";
       var _mustDisplayReportButtons = false;
-      
+
       // Display activate button if MO is provisioned but not yet in use.
       if (_state == 6){
-          var activate_text = (gLanguage == "de") ? "Aktivieren" : "Activate"; 
+          var activate_text = (gLanguage == "de") ? "Aktivieren" : "Activate";
           _htmlActivateButton = "<br><button id=\"activate\" type=\"submit\" name=\"activate\">" + activate_text + "</button>";
-      }       
+      }
       // Otherwise Display any activities if MO is in use only.
       var _balance = extractBalance(_ck, "value");
       if (_state == 3 && _balance != null){
         if (_balance > 0 && _balance < BALANCE_WARNING){
+          var remaining_bookings = Math.floor(_balance / 2);
+          var plural = (remaining_bookings != 1) ? ((gLanguage == "de") ? "en" : "s" ) : "";
           _htmlBalanceWarning = (gLanguage == "de") ?
-            "<h4 style=\"color:red;\">Warnung: Transaktionsvorrat niedrig...</h4>" :
-            "<h4 style=\"color:red;\">Warning: Transaction supply low...</h4>";
+            "<h4 style=\"color:red;\">Warnung: Transaktionsvorrat niedrig... nur noch " + remaining_bookings + " Buchung" + plural + " &uuml;brig</h4>" :
+            "<h4 style=\"color:red;\">Warning: Transaction supply low... only " + remaining_bookings + " booking" + plural + " left</h4>";
         }
         var addproject_name = (gLanguage == "de") ? "Neues Projekt hinzuf&uuml;gen: " : "Add new project: ";
         var addproject_description = (gLanguage == "de") ? "Beschreibung: " : "Description: ";
-        var addproject_button = (gLanguage == "de") ? "Zu Blockchain hinzuf&uuml;gen" : "Add to blockchain";  
+        var addproject_button = (gLanguage == "de") ? "Zu Blockchain hinzuf&uuml;gen" : "Add to blockchain";
         _htmlProjectActions = "<p><label for=\"addProjectName\"><b>" + addproject_name + "</b></label>" +
                               "<input id=\"addProjectName\" name=\"addProjectName\" type=\"text\" size=\"15\" maxlength=\"25\" class=\"validate\">" +
-                              "&nbsp;&nbsp;<button id=\"addProjectAction\" type=\"submit\" name=\"addProjectAction\">" + addproject_button + "</button></p>";                          
+                              "&nbsp;&nbsp;<button id=\"addProjectAction\" type=\"submit\" name=\"addProjectAction\">" + addproject_button + "</button></p>";
 
         var _projectsFileList = [];
         try {
           var _projectsFileObj = await parseJsonWithDefaultCatchingErrors(_ck.moFields.customPayload);
           if (_projectsFileObj.ListOfProjects){
-            _projectsFileList = _projectsFileObj.ListOfProjects; 
-          }           
+            _projectsFileList = _projectsFileObj.ListOfProjects;
+          }
         } catch(err) {
           // any error means no projects.
         }
@@ -704,17 +699,17 @@ async function printMoResult(_ck){
         if (_projectsFileList.length > 0){
           var booktime_intro = (gLanguage == "de") ? "<h3>Zeit buchen</h3> Projekt ausw&auml;hlen: " : "<h3>Book time</h3>Select project: ";
           var booktime_start_change = (gLanguage == "de") ? "Start oder &auml;ndern" : "Start or change";
-          var optional_comment_text = (gLanguage == "de") ? "optionaler Kommentar" : "Optional comment"; 
-          var booktime_stop = "Stop";  
+          var optional_comment_text = (gLanguage == "de") ? "optionaler Kommentar" : "Optional comment";
+          var booktime_stop = "Stop";
           _htmlProjectActions += booktime_intro + "<select id=\"projectSelection\" class=\"browser-default\">";
           for (var i=0; i<_projectsFileList.length;i++){
-            var currentProjectName = _projectsFileList[i]; 
-            _htmlProjectActions += "<option value=\"" + _projectsFileList[i] + "\">" + _projectsFileList[i] + "</option>";           
+            var currentProjectName = _projectsFileList[i];
+            _htmlProjectActions += "<option value=\"" + _projectsFileList[i] + "\">" + _projectsFileList[i] + "</option>";
           }
-          _htmlProjectActions += 
-            "</select>" + 
+          _htmlProjectActions +=
+            "</select>" +
             "<button id=\"startBookTime\" type=\"submit\" name=\"startBookTime\">" + booktime_start_change + "</button>&nbsp;&nbsp;" +
-            optional_comment_text + ":&nbsp;<input id=\"optComment\" name=\"optComment\" type=\"text\" size=\"15\" maxlength=\"32\" class=\"validate\"></p>";                      
+            optional_comment_text + ":&nbsp;<input id=\"optComment\" name=\"optComment\" type=\"text\" size=\"15\" maxlength=\"32\" class=\"validate\"></p>";
 
           if (!last_entry_examined.is_stopped){
             // Stop section with button and editable stop time. Maximum is current time and minimum the timestamp from the start entry.
@@ -723,40 +718,52 @@ async function printMoResult(_ck){
             var currentProjString = (gLanguage == "de") ? "Laufende Arbeit an: " : "Currently working on: ";
             var selectDifferentStopTimeString = (gLanguage == "de") ? "Andere Stop-Zeit" : "Different stop time";
             _htmlProjectActions += "<p><div id=\"stopTimeSection\"><b>" +
-                 currentProjString + "</b>" + last_entry_examined.last_project +   
+                 currentProjString + "</b>" + last_entry_examined.last_project +
                  "&nbsp;<button id=\"stopBookTime\" type=\"submit\" name=\"stopBookTime\">" + booktime_stop + "</button></p><b>" +
                  selectDifferentStopTimeString + ":</b>&nbsp;<input type=\"checkbox\" id=\"selectedStopTime\">&nbsp;&nbsp;" +
-                 "<span id=\"optionalStopTime\" hidden>" +                                        
+                 "<span id=\"optionalStopTime\" hidden>" +
                  ((gLanguage == "de") ? "<label for=\"stopTime\"><b> Stop-Datum/Zeit: </b></label>" : "<label for=\"stopTime\"><b> Stop date/time: </b></label>") +
-                 "<input id=\"stopTime\" name=\"stopTime\" type=\"datetime-local\" value=\"" + _nowTDString + "\" min=\"" + _minTDString + "\" max=\"" + _nowTDString + "\">" +                 
-                 "</span></div>";                                     
+                 "<input id=\"stopTime\" name=\"stopTime\" type=\"datetime-local\" value=\"" + _nowTDString + "\" min=\"" + _minTDString + "\" max=\"" + _nowTDString + "\">" +
+                 "</span></div>";
           }
 
-           
           if (last_entry_examined.history_len > 0){
-            var generate_report_button_text = (gLanguage == "de") ? "Report erzeugen" : "Generate report";         
-            _htmlProjectActions += "<p>" +  
-              "<div id=\"reportButtons\"></div><p>" +                                     
-              "<div id=\"reportSection\"></div>";                                    
             _mustDisplayReportButtons = true;
           }
         }
       }
-      
-      // TODO for Depleted objects, offer only to display the report. No time bookings possible anymore.
+
+      // Depleted objects should still be able to print the report. These just cannot book time anymore.
+      if (_state == 2 && _balance != null){
+        var depleted_booking_history;
+        try {
+          depleted_booking_history = await retrieveBookingHistory(_ck);
+          if (depleted_booking_history.length > 0){
+            _mustDisplayReportButtons = true;
+          }
+        } catch (err){
+          // any error means there are no valid bookings. The report buttons won't be displayed.
+        }
+      }
+
+      if (_state == 1){
+        _htmlProjectActions += (gLanguage == "de") ? "<h3>Auswertung nicht mehr erlaubt!</h3>" : "<h3>Report not allowed anymore!</h3>"
+      }
 
       var _htmlTimerSection = "";
       if (_ck.moFields.timeBombs !== undefined){
-        _htmlTimerSection = ((gLanguage == "de") ? "<p><h3>Timer-Information:</h3></p>": "<p><h3>Timer information:</h3></p>") + 
-                            decodeTimebombArray(_ck.moFields.timeBombs, gLanguage);      
-      }        
-      _htmlFullMessage = _htmlMoHeading + _htmlActivateButton + _htmlBalanceWarning + _htmlProjectActions + _htmlVacationActions + _htmlTimerSection + _htmlFinalWaitMsgSection; 
-    }  
-  
+        _htmlTimerSection = ((gLanguage == "de") ? "<p><h3>Timer-Information:</h3></p>": "<p><h3>Timer information:</h3></p>") +
+                            decodeTimebombArray(_ck.moFields.timeBombs, gLanguage);
+      }
+
+      _htmlProjectActions += "<p><div id=\"reportButtons\"></div><p><div id=\"reportSection\"></div>";
+      _htmlFullMessage = _htmlMoHeading + _htmlActivateButton + _htmlBalanceWarning + _htmlProjectActions + _htmlTimerSection + _htmlFinalWaitMsgSection;
+    }
+
     writeToMain(_htmlFullMessage);
     if (_mustDisplayReportButtons){
       displayReportButtons();
-      handleHideReport();        
+      handleHideReport();
     }
   }
   //console.log("Signing out in the background (printMoResult)");
@@ -765,12 +772,12 @@ async function printMoResult(_ck){
 
   $("#generateReport").click(function (e) {
     e.preventDefault();
-    handleUpdateReport(); 
+    handleUpdateReport();
   });
 
   $("#addProjectAction").click(function (e) {
     e.preventDefault();
-    handleAddProjectEntry(); 
+    handleAddProjectEntry();
   });
 
   $("#selectedStopTime").change(function (e) {
@@ -780,20 +787,19 @@ async function printMoResult(_ck){
 
   $("#startBookTime").click(function (e) {
     e.preventDefault();
-    handleStartBooking(); 
+    handleStartBooking();
   });
   $("#stopBookTime").click(function (e) {
     e.preventDefault();
-    handleStopBooking(); 
+    handleStopBooking();
   });
   $("#activate").click(function (e) {
     e.preventDefault();
-    handleMoActivation(); 
+    handleMoActivation();
   });
 }
 
 $(document).ready(function(){
-    //console.log("Entering document ready function");    
+    //console.log("Entering document ready function");
     mainMoDisplay();
   });
-
