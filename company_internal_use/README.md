@@ -30,7 +30,7 @@ a small subset of the platform's capabilities.
    
    c) [DataTables with PDFMake](https://datatables.net/download/) - 
       Select DataTables, and in the Extensions section select "Buttons", "HTML5 export", "JSZip", "pdfmake" and "Print view".
-      In the download section (Step 3) select Tabl "Download", then download "datatables.min.js" and "datatables.min.css".
+      In the download section (Step 3) select Tab "Download", then download "datatables.min.js" and "datatables.min.css".
       Copy "datatables.min.js" to js/thirdparty and "datatables.min.css" to the css subdirectory.
 
      
@@ -39,12 +39,14 @@ a small subset of the platform's capabilities.
    you may use production credentials if you actually plan to use it as tool for your business - development blockchains
    will disappear after a while and therefore cannot be used to serve as fraud-proof database.
 
-   Save the .json file on your web server, in a directory not publicly accessible.
+   Save the .json file of the created sub-licensee on your local drive (not on the web server), it should not be 
+   accessible by anybody other than you.
    
-6. Using this sub-licensee, create an end user with 7 life and sufficient value. Fields are not yet needed to be defined,
-   the demo itself allows to create these while using. Optionally you might want to define an expiration timer, e.g. to
-   expire by the end of the calendar year or after a certain time of usage.
-   Provision the end user from the Dashboard UI.
+6. Using this sub-licensee, log in to the Dashboard UI, and create an end user with 7 life and sufficient value (e.g. 5000 allows
+   more than 20 start/stop records per usual working day). Fields are not yet needed to be defined, the demo itself allows to
+   create these while using. Optionally you might want to define an expiration timer, e.g. to expire by the end of the calendar
+   year or after a certain time of usage. Provision the new end user from the Dashboard UI (= decrease its life to state 
+   6 "Provisioned").
 
 7. Modify js/genericConvertQrMain.js line 32
    const gTargetUrlStart  = "https://www.connictro.de/bc-examples/companyInternalExample.html?";
@@ -74,4 +76,5 @@ stop time instead.
 Once the first recording has finished (by start and stop or change), the report is available.
 It can be viewed, or exported to clipboard, CSV, Excel (also LibreOffice), PDF or sent to the printer. The DataTables component
 also allows to filter, limit or extend the amount of records displayed, or sort the columns.
-
+Should the end user MO be depleted (used up all value, or an optional timer has advanced life to "Depleted"), the report can
+still be viewed and exported. It is however not possible anymore to make transactions (book time).
