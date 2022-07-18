@@ -268,7 +268,8 @@ async function printMoResult(_ck){
         }
       }
 
-      var _htmlDescription = _ck.moFields.customPayload + "<br>";
+      var _nodescText = (gLanguage == "de") ? "(Keine Beschreibung angegeben)<br>" : "(no description provided)<br>";
+      var _htmlDescription = (_ck.moFields.customPayload === undefined) ? _nodescText : (_ck.moFields.customPayload + "<br>");
       var _htmlTimerSection = (gLanguage == "de") ? "<p><h3>Timer-Information:</h3></p>": "<p><h3>Timer information:</h3></p>";
 
       var _htmlTimerInfo = (gLanguage == "de") ? "<p><b>Keine definiert!</b></p>" : "<p><b>None defined!</b></p>";
