@@ -187,7 +187,7 @@ class MoBody{
   function serialize(){
     // Serializing to JSON, make sure an empty customPayload and extra quotes are excluded.
     $bodyJson = json_encode($this);
-    $bodyJsonFiltered =    preg_replace("/\]\"/", "]", preg_replace("/:\"\[/", ":[", preg_replace("/\\\\\"/", "\"", preg_replace("/,\"customPayload\"\:null/", "", $bodyJson))));
+    $bodyJsonFiltered =    preg_replace("/\]\"/", "]", preg_replace("/:\"\[/", ":[", preg_replace("/\\\\\"/", "\"", preg_replace("/,\"customPayload\"\:null/", "", preg_replace("/,\"customId\"\:null/", "", $bodyJson)))));
     return $bodyJsonFiltered;
   }
 }
