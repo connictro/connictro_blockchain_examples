@@ -35,50 +35,29 @@ const COOKIE_NAME = "url_and_node_tokens";
 const DEMO_SCRIPT_URL = "https://www.connictro.de/bc-examples/cb_webauth_demo.php?content=";
 const EMPTY_COOKIE = { nodeUrl: "", accessToken: "", refreshToken: "", accessTokenExpires: "", refreshTokenExpires: ""};
 
-const CHAIN_PORT_A = 58081; // For A development chain (starting Jan-Mar-May-Jul-Sep-Nov)
-const CHAIN_PORT_B = 58082; // For B development chain (starting Feb-Apr-Jun-Aug-Oct-Dec)
-                            // For production chain set to 58080 (not recommended for this demo as all data in production will be PERMANENT!).
+const SELECTED_CHAIN = "?"; /* NOTE: "?" will determine the current demo chain by month.
+                             * For your own work, please set this instead to to the development chain assigned to you
+                             * (A or B), or to "P" if intended to use on the production blockchain.
+                             */
+var mCookieContent;
+var mResourceParam;
+var mEncHash;
+var mSelectedCredsArray;
 
-const SELECTED_CHAIN = "A"; // NOTE: Set this to the development chain assigned to you.
 
-const DEV_NODE_LIST = [
-        "https://node1.connictro-blockchain.de:",
-        "https://node2.connictro-blockchain.de:",
-        "https://node3.connictro-blockchain.de:"
-        ]
-var gRandNode = null;
-var gLanguage;
-var gCookieContent;
-var gResourceParam;
-
-/*
- * This chooses a random blockchain node for some load balancing.
- * Until reloaded the node will stay the same.
- * Development service currently runs on 3 nodes.
- * Chains A and B both run on these nodes but on different ports.
- */
-function chooseNode(_chain){
-  var _numNodes = DEV_NODE_LIST.length;
-  if (gRandNode == null){
-    gRandNode = Math.floor(Math.random() * _numNodes);
-  }
-  var _chainPort = (_chain == 'a' || _chain == 'A') ? CHAIN_PORT_A: CHAIN_PORT_B;
-  return (DEV_NODE_LIST[gRandNode] + _chainPort);
-}
-
-function parseUrlParameters(){
-  //console.log("Entering parseUrlParameters");
-  gResourceParam = GetParams['content'];
+function parseUrlParametersWebauth(){
+  //console.log("Entering parseUrlParametersWebauth");
+  mResourceParam = GetParams['content'];
   gLanguage = GetParams['l'];
 
-  if (gResourceParam == undefined ){
+  if (mResourceParam == undefined ){
     var invalid_param_msg = (gLanguage == "de") ?
                               "<h3>Ung&uuml;ltiger Parameter</h3>Bitte angeben: content= (Dateiname angeforderter Inhalt)!<br>" :
                               "<h3>Invalid Parameter</h3>Must specify content= (requested file name)!<br>";
     writeToMain(invalid_param_msg);
     return false;
   }
-  //console.log("Leaving parseUrlParameters");
+  //console.log("Leaving parseUrlParametersWebauth");
   return true;
 }
 function readCookie(){
@@ -103,7 +82,7 @@ function readATCleanedCookie(){
   }
   _cookie.accessToken = "";
   _cookie.accessTokenExpires = "";
-  gCookieContent = _cookie;
+  mCookieContent = _cookie;
 }
 
 function badLoginCallbackManual(){
@@ -116,17 +95,30 @@ function badLoginCallbackAuto(){
 }
 
 function goodLoginCallback(_newCredentials){
-  gCookieContent.accessToken = _newCredentials.accessToken;
-  gCookieContent.refreshToken = _newCredentials.refreshToken;
-  gCookieContent.accessTokenExpires = _newCredentials.accessTokenExpires;
-  gCookieContent.refreshTokenExpires = _newCredentials.refreshTokenExpires;
-  setCookie(gCookieContent);
+  mCookieContent.accessToken = _newCredentials.accessToken;
+  mCookieContent.refreshToken = _newCredentials.refreshToken;
+  mCookieContent.accessTokenExpires = _newCredentials.accessTokenExpires;
+  mCookieContent.refreshTokenExpires = _newCredentials.refreshTokenExpires;
+  setCookie(mCookieContent);
 
   // redirect back to demo PHP, now with credentials in the cookie.
-  var newUrl = DEMO_SCRIPT_URL + gResourceParam;
+  var newUrl = DEMO_SCRIPT_URL + mResourceParam;
   location.assign(newUrl);
 }
 
+function handleMultiCredsSelection(){
+  //console.log("Entering handleMultiCredsSelection");
+  var _clientCertificate = "";
+  var _selectedKey = $('#signInKeyPicker').val();
+  for (var i=0; i<mSelectedCredsArray.length; i++){
+    if (mSelectedCredsArray[i].clientKey == _selectedKey){
+      _clientCertificate = mSelectedCredsArray[i].clientCertificate;
+      break;
+    }
+  }
+  loginCredsSelectedAction(_selectedKey, mEncHash, _clientCertificate);
+  //console.log("Entering handleMultiCredsSelection");
+}
 
 function loginScreen(_errMsg){
   var _demo_signinpage = (_errMsg ? _errMsg : "");
@@ -139,32 +131,66 @@ function loginScreen(_errMsg){
     "<h3>Web authentication - protected content demo</h3>" +
     "Sign in using certificate file:&nbsp;" +
     "<input type=\"file\" id=\"loadCreds\" />" ;
+  _demo_signinpage += "<div id=\"selectMultiCreds\"></div>"
   writeToMain(_demo_signinpage);
-  // As callback for the file selector use loginCredsSelected().
 
+  // As callback for the file selector use loginCredsSelected().
   $("#loadCreds").on('change', function (e) {
     //console.log("in eventlistener for file open button");
     openLocalFile(e.target.files, loginCredsSelected);
   });
 }
 
+function loginCredsMultipleAction(_encHash, _selectedCredsArray){
+  //console.log("Entering loginCredsMultipleAction");
+  /* If a credentials fiel with multiple sign-in keys was selected, draw a selection option with handlers.
+   * Final sign-in will happen if a selection has been made and the handleMultiCredsSelection is called by
+   * clicking on the "Sign in" button.
+   */
+  var _htmlMultiKeySelect = (gLanguage == "de") ? "<h3>Mehrere Zertifikate enthalten - bitte ausw&auml;hlen</h3>" : "<h3>Detected multiple certificates - please select</h3>";
+  var select_key_text = (gLanguage == "de") ? "W&auml;hlen Sie bitte das Zertifikat aus" : "Please select the certificate";
+  var sign_in_text = (gLanguage == "de") ? "Einloggen" : "Sign in";
+  _htmlMultiKeySelect += "<select id=\"signInKeyPicker\" class=\"browser-default\">" +
+                          "<option value=\"\" disabled selected>" + select_key_text + "</option>";
+
+  for (var i=0; i<_selectedCredsArray.length; i++){
+    _htmlMultiKeySelect += "<option value=\"" + _selectedCredsArray[i].clientKey + "\">" + _selectedCredsArray[i].clientKey + "</option>";
+  }
+  _htmlMultiKeySelect += "</select><br><br><button id=\"selectedSignIn\" type=\"submit\" name=\"selectedSignIn\">" + sign_in_text + "</button>";
+
+  mEncHash = _encHash;
+  mSelectedCredsArray = _selectedCredsArray;
+  writeToSection("selectMultiCreds", _htmlMultiKeySelect);
+  document.getElementById("selectedSignIn").disabled = true;
+
+  $("#signInKeyPicker").on('change', function (e) {
+    document.getElementById("selectedSignIn").disabled = false;
+  });
+
+  $("#selectedSignIn").click(function (e) {
+    e.preventDefault();
+    handleMultiCredsSelection();
+  });
+  //console.log("Leaving loginCredsMultipleAction");
+}
+
 function loginCredsSelectedAction(_clientKey, _encHash, _clientCertificate){
-    doJustSignin(goodLoginCallback, badLoginCallbackManual, gCookieContent.nodeUrl, _clientKey, _encHash, _clientCertificate);
+    doJustSignin(goodLoginCallback, badLoginCallbackManual, mCookieContent.nodeUrl, _clientKey, _encHash, _clientCertificate);
 }
 
 function checkRTValid(){
-  if (!gCookieContent.refreshToken) return false;
-  if (!checkTokenValid(gCookieContent.refreshTokenExpires)) return false;
+  if (!mCookieContent.refreshToken) return false;
+  if (!checkTokenValid(mCookieContent.refreshTokenExpires)) return false;
   return true;
 }
 
 function loginPreCheck(){
   //console.log("Entering loginPreCheck");
-  if (!parseUrlParameters()) return;
+  if (!parseUrlParametersWebauth()) return;
   readATCleanedCookie();
 
   if (checkRTValid()){
-    doJustSigninRefresh(goodLoginCallback, badLoginCallbackAuto, gCookieContent.nodeUrl, gCookieContent.refreshToken);
+    doJustSigninRefresh(goodLoginCallback, badLoginCallbackAuto, mCookieContent.nodeUrl, mCookieContent.refreshToken);
   } else {
     badLoginCallbackAuto();
   }

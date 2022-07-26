@@ -35,38 +35,18 @@
  */
 "use strict";
 
-const gTargetUrlStart  = "https://www.connictro.de/bc-examples/permitVoucherExample.html?";
+const gTargetUrlStart  = "https://www.connictro.de/bc-examples/";
+const gTargetScript    = "permitVoucherExample.html";
 const gProvisionScript = "https://www.connictro.de/bc-examples/cbdemo.php";
 var gUrlParams = null;
-var gLanguage;
 
-function parseUrlParameters(){
-    var clientKeyParam = GetParams['k'];
-    var clientCertParam = GetParams['c'];
-    var encHashParam = GetParams['e'];
-    var devChain = GetParams['d'];
+function parseUrlParametersWithProv(){
+  var _signinCreds = parseUrlParametersJustCreds();
+  if (_signinCreds != null){
     var displayProvButton = GetParams['p'];
-    gLanguage = GetParams['l'];
-
-    if (clientKeyParam == undefined || clientCertParam == undefined || encHashParam == undefined || devChain == undefined){
-      var invalid_param_msg = gLanguage ?
-                              "<h3>Ung&uuml;ltige Parameter</h3>Bitte angeben: d (Demo Blockchain A oder B), e (encHash), k (clientKey) und c (clientCertificate)!</h3>" :
-                              "<h3>Invalid Parameters</h3>Must specify d (chain A or B), e (encHash), k (clientKey) and c (clientCertificate)!</h3>";
-      writeToMain(invalid_param_msg);
-      return null;
-    }
-
-    if (devChain != 'a' && devChain != 'A' && devChain != 'b' && devChain != 'B'){
-      writeToMain("<h3>Invalid chain specified - must be A or B</h3>");
-      return null;
-    }
-    gUrlParams = {
-      clientKey: clientKeyParam,
-      clientCertificate: clientCertParam,
-      encHash: encHashParam,
-      chain: devChain,
-      provision: (displayProvButton !== undefined) ? ((displayProvButton == "true" || displayProvButton == 1) ? true : false) : false
-    }
+    _signinCreds.provision = (displayProvButton !== undefined) ? ((displayProvButton == "true" || displayProvButton == 1) ? true : false) : false;
+  }
+  return _signinCreds;
 }
 
 function handleProvisionDemo(){
@@ -97,26 +77,10 @@ function handleProvisionDemo(){
 }
 
 function generateCbQr(){
-  parseUrlParameters();
+  gUrlParams = parseUrlParametersWithProv();
   if (gUrlParams == null) return;
 
-  var _qrUrl = gTargetUrlStart +
-               "d=" + gUrlParams.chain +
-               (gLanguage ? ("&l=" + gLanguage) : "") +
-               "&k=" + gUrlParams.clientKey +
-               "&e=" + gUrlParams.encHash +
-               "&c=" + gUrlParams.clientCertificate;
-
-  var _htmlHeading   = (gLanguage == "de") ?
-                         "<h3>Bitte scannen oder ausdrucken, um auf das Connictro Blockchain-Beispiel zuzugreifen</h3>" :
-                         "<h3>Please scan or print to access Connictro Blockchain example</h3>";
-  var _htmlQrElement = "<div id=\"qrcode\" style=\"width:100px; height:100px; margin-top:15px; margin-bottom:170px;\"></div>";
-  var _htmlPlainUrl  = (gLanguage == "de") ?
-                         "<p><div>&nbsp;&nbsp;<a href=\"" + _qrUrl + "\" target=\"_blank\">(oder klicken Sie hier)</a></div></p>"  :
-                         "<p><div>&nbsp;&nbsp;<a href=\"" + _qrUrl + "\" target=\"_blank\">(or click this link instead)</a></div></p>";
-  var _htmlProvisionButton = "<div id=\"provisioning\"></div>";
-
-  writeToMain(_htmlHeading + _htmlQrElement + _htmlPlainUrl + _htmlProvisionButton);
+  genericGenerateCbQr(gTargetUrlStart, gTargetScript, gUrlParams.chain, gUrlParams.clientKey, gUrlParams.encHash, gUrlParams.clientCertificate, 0);
 
   // generate the provisioning button if it should be displayed
   if (gUrlParams.provision){
@@ -125,12 +89,6 @@ function generateCbQr(){
                                   "<br><h3>Do not close this tab before new MO was provisioned!</h3><button id=\"provision\" type=\"submit\" name=\"provision\">Provision created voucher now!</button><br><br><div id=\"provisionerror\"></div>";
     writeToSection("provisioning", _htmlProvisionSection);
   }
-
-  var qrcode = new QRCode(document.getElementById("qrcode"), {
-	  width : 250,
-	  height : 250
-  });
-  qrcode.makeCode(_qrUrl);
 
   $("#provision").click(function (e) {
     e.preventDefault();

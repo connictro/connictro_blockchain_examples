@@ -16,10 +16,35 @@
  * limitations under the License.
  */
 "use strict";
+
+const CHAIN_PORT_P = 58080; // Production blockchain - only use for productive purposes, not for demos/testing.
+const CHAIN_PORT_A = 58081; // 58081 is the default port for A development chain (reset in Jan-Mar-May-Jul-Sep-Nov)
+const CHAIN_PORT_B = 58082; // For B development chain (reset Feb-Apr-Jun-Aug-Oct-Dec) set to 58082.
+
+const DEV_NODE_LIST = [
+        "https://node1.connictro-blockchain.de:",
+        "https://node2.connictro-blockchain.de:",
+        "https://node3.connictro-blockchain.de:"
+        ]
+const PROD_NODE_LIST = [
+        "https://node1.connictro-blockchain.de:",
+        "https://node2.connictro-blockchain.de:",
+        "https://node3.connictro-blockchain.de:",
+        "https://node4.connictro-blockchain.de:",
+        "https://node5.connictro-blockchain.de:"
+        ]
+
 const API_REFRESH_BEFORE_EXPIRE_MILLISECONDS = 30000;
 
 const life_states_de = ["ung&uuml;ltig", "zur&uuml;ckgegeben", "abgelaufen", "g&uuml;ltig!", "wartet auf Pairing", "wartet auf Validierung", "noch nicht aktiv (bereitgestellt)", "noch nicht aktiv"];
 const life_states_en = ["invalid", "returned", "expired", "valid", "waiting for pairing", "waiting for validation", "not yet active (provisioned)", "not yet active"];
+
+var gShowingHistory = false; // for demos showing/hiding a history or report section. Tracks wheter the section is shown or not.
+var gRandNode = null;
+var gLanguage;
+var gShowCallback;
+var gHideCallback;
+var gAreaSectionId;
 
 /* ===============================================================================================
  * Connictro Blockchain service API handling
@@ -128,6 +153,39 @@ function readOwnMoFieldsRaw(_ck){
   });
 }
 
+/* Reads foreign MO's single field or asset, specifying if history (for asset) is needed
+ * Passing "allAssets" as field name retrieves all assets as returned by the node.
+ */
+function readForeignMoSingleFieldOrAssetRaw(_ck, _clientKey, _fieldOrAssetName, _needHistory){
+  return new Promise((resolve, reject) => {
+    //console.log("Entering readForeignMoSingleFieldOrAssetRaw");
+    var _at = _ck.accessToken;
+    var _server = _ck.server;
+    var _historyQueryParam = (_needHistory) ? "?history=true" : "";
+    $.ajax({
+      type: 'get',
+      headers: {accessToken: _at},
+      url: _server + '/cbv1/mos/' + _clientKey + '/' + _fieldOrAssetName + _historyQueryParam,
+      success: function (response) {
+          //console.log(response);
+          //console.log("Resolving readForeignMoSingleFieldOrAssetRaw");
+          resolve(response);
+      },
+      error: function (response) {
+          if (response.status == 404) {
+            //console.log("No field/asset present for " + _ck.clientKey);
+            //console.log("Resolving readForeignMoSingleFieldOrAssetRaw (not found)");
+            resolve(null);
+            return;
+          } else {
+            //console.log("Rejecting readForeignMoSingleFieldOrAssetRaw");
+            reject(null);
+          }
+      }
+   });
+ });
+}
+
 /* Reads own MO assets (w/o history)
  */
 function readOwnMoAssetsRaw(_ck, _needHistory){
@@ -161,6 +219,8 @@ function readOwnMoAssetsRaw(_ck, _needHistory){
  });
 }
 
+
+
 /* Update own MO - fields or single asset (only deduction is possible in this API).
  */
 function updateOwnMoRaw(_ck, _queryParams, _asset, _requestBodyStr){
@@ -185,8 +245,43 @@ function updateOwnMoRaw(_ck, _queryParams, _asset, _requestBodyStr){
           resolve(final_response);
       },
       error: function (response) {
-        //console.log("Error updating MO");
+        console.log("Error updating MO");
         reject(null);
+      }
+   });
+ });
+}
+
+/* Reads dependent MO list (Submos) of specified key. This API is available for (Sub-)Licensees only.
+ */
+function readSubmosRaw(_ck, _clientKey){
+  return new Promise((resolve, reject) => {
+    //console.log("Entering readSubmosRaw");
+    if (_clientKey === undefined){
+      _clientKey = _ck.clientKey;
+    }
+    var _target = (_ck.clientKey == _clientKey) ? '0' : _clientKey;
+    var _at = _ck.accessToken;
+    var _server = _ck.server;
+    $.ajax({
+      type: 'get',
+      headers: {accessToken: _at},
+      url: _server + '/cbv1/mos/' + _target + '/submos',
+      success: function (response) {
+          //console.log(response);
+          //console.log("Resolving readSubmosRaw");
+          resolve(response);
+      },
+      error: function (response) {
+        if (response.status == 404) {
+          //console.log("No submos present for " + _clientKey);
+          //console.log("Resolving readSubmosRaw (not found)");
+          resolve("");
+          return;
+        } else {
+          console.log("Error reading MO dependents of " + _clientKey + ", error message:" + response);
+          reject(null);
+        }
       }
    });
  });
@@ -312,7 +407,7 @@ function updateAssetBalance(_ck, _assetName, _nodeResponse){
   //console.log("Leaving updateAssetBalance");
 }
 
-function doBurnAsset(_waitMsgId, _assetName, _txRecord, _ck, _lang, _mustAlwaysWait){
+async function doBurnAsset(_waitMsgId, _assetName, _txRecord, _ck, _lang, _mustAlwaysWait){
   //console.log("Entering doBurnAsset");
 
   var tx_record_object = {name:"transactionRecord",value:_txRecord};
@@ -327,7 +422,7 @@ function doBurnAsset(_waitMsgId, _assetName, _txRecord, _ck, _lang, _mustAlwaysW
     $(_waitMsgId).append(waitmsg);
   }
   //console.log("Leaving doBurnAsset, transferring control to updateOwnMoRaw");
-  return updateOwnMoRaw(_ck, qp, _assetName, "");
+  return await updateOwnMoRaw(_ck, qp, _assetName, "");
 }
 
 /* All-in-one to modify a field. Requires already being signed in.
@@ -350,6 +445,17 @@ async function doModifyField(_waitMsgId, _fieldName, _newFieldValue, _successCal
   //console.log(_ck)
   _successCallback(_ck);
   return null;
+}
+
+async function doReadOwnDependents(_successCallback, _failureCallback, _ck){
+  //console.log("Entering doReadOwnDependents");
+  try {
+    var nodeResponse = await readSubmosRaw(_ck);
+    _successCallback(_ck, nodeResponse);
+  } catch (err){
+    _failureCallback();
+  }
+  //console.log("Leaving doReadOwnDependents");
 }
 
 /* All-in-one for voucher example: Sign in, decrement value by 1, read own MO fields + assets (w/o history)
@@ -375,14 +481,13 @@ async function doSigninConsumeAndReadMo(_waitMsgId, _assetName, _txRecord, _succ
     /* need to read assets again in case of depletion or life update. Otherwise just update the balance. */
     if (vBalance <= 1 || _assetName != "value"){
       await readOwnMoAssetsRaw(_ck, false);
-      //console.log("Read assets (again) successful");
     } else {
       /* Replace returned remaining value (so we won't have to wait for blockchain finalization just to display the result) */
-      updateAssetBalance(_ck, _assetName, nodeResponse);
+      updateAssetBalance(_ck, _assetName, node_response);
     }
 
   } catch (err) {
-    //console.log("Leaving doSigninConsumeAndReadMo (promise failed)");
+    console.log("Leaving doSigninConsumeAndReadMo (promise failed)");
     _failureCallback();
     return null;
   }
@@ -626,15 +731,218 @@ function checkTokenValid(atTime) {
  * ===============================================================================================
  */
 
+/*
+ * This chooses a random blockchain node for some load balancing.
+ * Until reloaded the node will stay the same.
+ * Development service currently runs on 3 nodes.
+ * Production service currently runs on 5 nodes.
+ * Chain services development A/B and production run on these nodes but on different ports.
+ * If "?" is passed as parameter (instead of a letter consisting of aAbBpP), determine the current
+ * demo chain by current month (B in odd and A in even months).
+ */
+function chooseNode(_chain){
+  if (_chain == '?'){
+    var current_month = new Date().getMonth() + 1;
+    _chain = ((current_month %2) == 1) ? "B" : "A";
+  }
+
+  var _nodeList = (_chain == 'P' || _chain == 'p') ? PROD_NODE_LIST : DEV_NODE_LIST;
+  var _numNodes = _nodeList.length;
+  if (gRandNode == null){
+    gRandNode = Math.floor(Math.random() * _numNodes);
+  }
+  var _chainPort = (_chain == 'P' || _chain == 'p') ? CHAIN_PORT_P: ((_chain == 'a' || _chain == 'A') ? CHAIN_PORT_A: CHAIN_PORT_B);
+
+  return (_nodeList[gRandNode] + _chainPort);
+}
+
+function parseUrlParametersJustCreds(){
+  //console.log("Entering parseUrlParametersJustCreds");
+  var clientKeyParam = GetParams['k'];
+  var clientCertParam = GetParams['c'];
+  var encHashParam = GetParams['e'];
+  var devChain = GetParams['d'];
+  gLanguage = GetParams['l'];
+
+  if (clientKeyParam == undefined || clientCertParam == undefined || encHashParam == undefined || devChain == undefined){
+    var invalid_param_msg = (gLanguage == "de") ?
+                              "<h3>Ung&uuml;ltige Parameter</h3>Bitte angeben: d (P - Production Blockchain oder Demo Blockchain: A oder B), e (encHash), k (clientKey) und c (clientCertificate)!</h3>" :
+                              "<h3>Invalid Parameters</h3>Must specify d (production blockchain P or demo blockchain: A or B), e (encHash), k (clientKey) and c (clientCertificate)!</h3>";
+    writeToMain(invalid_param_msg);
+    return null;
+  }
+
+  var _chosenChain = null;
+
+  if (devChain == 'p' || devChain == 'P'){
+    _chosenChain = 'P';
+  } else if (devChain != null && (devChain != 'a' && devChain != 'A')){ // default to A dev chain if not specified
+    _chosenChain = 'B';
+  } else {
+    _chosenChain = 'A';
+  }
+
+  var _signinCreds = {
+              clientKey: clientKeyParam,
+              clientCertificate: clientCertParam,
+              encHash: encHashParam,
+              chain: _chosenChain
+            }
+  //console.log("Leaving parseUrlParametersJustCreds");
+  return _signinCreds;
+}
+
+function parseUrlParametersAndChooseNode(){
+  //console.log("Entering parseUrlParametersAndChooseNode");
+  var _signinCreds = parseUrlParametersJustCreds();
+  if (_signinCreds != null){
+    var chosenServer = chooseNode(_signinCreds.chain);
+    _signinCreds.server = chosenServer;
+  }
+  //console.log("Leaving parseUrlParametersAndChooseNode");
+  return _signinCreds;
+}
+
+function printMoFailure(){
+  var signinfail = (gLanguage == "de") ? "<h3>Fehler: Login fehlgeschlagen!</h3>" : "<h3>Error: Sign-in failed!</h3>";
+  writeToMain(signinfail);
+}
+
+function modifyMoFailure(){
+  var modifyfail = (gLanguage == "de") ? "<h3>Fehler: MO-&Auml;nderung fehlgeschlagen!</h3>" : "<h3>Error: MO change failed!</h3>";
+  writeToMain(modifyfail);
+}
+
+function mainMoDisplay(_withHistory){
+  //console.log("Entering mainMoDisplay");
+  var _signinCreds = parseUrlParametersAndChooseNode();
+  if (_signinCreds == null) return;
+
+  doSigninAndReadMo(printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, _withHistory);
+  //console.log("Leaving mainMoDisplay");
+}
+
+function mainMoDisplayWithHistory(){ return mainMoDisplay(true); }
+function mainMoDisplayWOHistory()  { return mainMoDisplay(false); }
+
+async function handleMoActivation(){
+  //console.log("Entering handleMoActivation");
+  var _signinCreds = parseUrlParametersAndChooseNode();
+  var activate_txrecord = (gLanguage == "de") ? "Demo MO-Aktivierung" : "Demo activate MO";
+
+  var _ck = doSigninConsumeAndReadMo("#waitMsg", "life", activate_txrecord, printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, gLanguage);
+  if (_ck == null){
+    var unable_status_msg = (gLanguage == "de") ? "<h3>Kann MO-Status nicht &auml;ndern!</h3>" : "<h3>Unable to change MO status!</h3>";
+    writeToMain(unable_status_msg);
+  } else {
+    $("#waitMsg").empty();
+  }
+  //console.log("Leaving handleMoActivation");
+}
+
+function handleHideHistorySection(_sectionName, _callback){
+  //console.log("Entering handleHideHistorySection");
+  gShowingHistory = false;
+  var sectionDivName = '#' + _sectionName;
+  $(sectionDivName).empty();
+  _callback();
+  //console.log("Leaving handleHideHistorySection");
+}
+
+async function handleUpdateHistorySection(_goodCallback){
+  //console.log("Entering handleUpdateHistory");
+  var _signinCreds = parseUrlParametersAndChooseNode();
+  var _ck = doSigninAndReadMo(_goodCallback, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);
+  //console.log("Leaving handleUpdateHistory");
+}
+
+function handleDisplayHistoryButtons(_showId, _hideId, _visibleNameDE, _visibleNameEN, _buttonSectionId, _areaSectionId, _showCallback, _hideCallback){
+  //console.log("Entering handleDisplayHistoryButtons, gShowingHistory = " + gShowingHistory);
+  var _htmlHistoryButtons;
+  if (gShowingHistory){
+    _htmlHistoryButtons = (gLanguage == "de") ?
+                          "<button id=\"" + _showId + "\" type=\"submit\" name=\"" + _showId + "\">" + _visibleNameDE + " aktualisieren</button>" +
+                          "<button id=\"" + _hideId + "\" type=\"submit\" name=\"" + _hideId + "\">" + _visibleNameDE + " verstecken</button>" :
+                          "<button id=\"" + _showId + "\" type=\"submit\" name=\"" + _showId + "\">Update " + _visibleNameEN + "</button>" +
+                          "<button id=\"" + _hideId + "\" type=\"submit\" name=\"" + _hideId + "\">Hide " + _visibleNameEN + "</button>";
+  } else {
+    _htmlHistoryButtons = (gLanguage == "de") ?
+                            "<button id=\"" + _showId + "\" type=\"submit\" name=\"" + _showId + "\">" + _visibleNameDE + " zeigen</button>" :
+                            "<button id=\"" + _showId + "\" type=\"submit\" name=\"" + _showId + "\">Show " + _visibleNameEN + "</button>";
+  }
+  writeToSection(_buttonSectionId, _htmlHistoryButtons);
+  var showWidgetName = '#' + _showId;
+  var hideWidgetName = '#' + _hideId;
+  gShowCallback = _showCallback;
+  gHideCallback = _hideCallback;
+  gAreaSectionId = _areaSectionId;
+
+  $(showWidgetName).click(function (e) {
+    e.preventDefault();
+    handleUpdateHistorySection(gShowCallback);
+  });
+
+  $(hideWidgetName).click(function (e) {
+    e.preventDefault();
+    handleHideHistorySection(gAreaSectionId, gHideCallback);
+  });
+  //console.log("Leaving handleDisplayHistoryButtons");
+}
+
+
+function genericGenerateCbQr(_baseUrlValue, _targetValue, _chain, _clientKey, _encHash, _clientCertificate, _appendId){
+  var targetUrlStart = _baseUrlValue + _targetValue + "?";
+  var qrUrl = targetUrlStart +
+               "d=" + _chain +
+               (gLanguage ? ("&l=" + gLanguage) : "") +
+               "&k=" + _clientKey +
+               "&e=" + _encHash +
+               "&c=" + _clientCertificate;
+
+  var qrcode_id = (_appendId > 0) ? ("qrcode" + _appendId) : "qrcode";
+  var _htmlHeading   = (gLanguage == "de") ?
+                         "<h3>Bitte scannen oder ausdrucken, um auf das Connictro Blockchain-Beispiel zuzugreifen</h3>" :
+                         "<h3>Please scan or print to access Connictro Blockchain example</h3>";
+  var _htmlQrElement = "<div id=\"" + qrcode_id + "\" style=\"width:100px; height:100px; margin-top:15px; margin-bottom:170px;\"></div>";
+  var _htmlPlainUrl  = (gLanguage == "de") ?
+                         "<p><div>&nbsp;&nbsp;<a href=\"" + qrUrl + "\" target=\"_blank\">(oder klicken Sie hier)</a></div></p>"  :
+                         "<p><div>&nbsp;&nbsp;<a href=\"" + qrUrl + "\" target=\"_blank\">(or click this link instead)</a></div></p>";
+  var _htmlProvisionButton = "<div id=\"provisioning\"></div>";
+  var _allHtml = _htmlHeading + _htmlQrElement + _htmlPlainUrl + _htmlProvisionButton;
+
+  if (_appendId > 0){
+    appendToMain(_allHtml);
+  } else {
+    writeToMain(_allHtml);
+  }
+
+  var qrcode = new QRCode(document.getElementById(qrcode_id), {
+	  width : 250,
+	  height : 250
+  });
+  qrcode.makeCode(qrUrl);
+}
+
+
 function writeToSection(section, htmlText){
   var _sectionId = "#" + section;
   $(_sectionId).empty();
   $(_sectionId).append(htmlText);
 }
 
+function appendToSection(section, htmlText){
+  var _sectionId = "#" + section;
+  $(_sectionId).append(htmlText);
+}
+
 function writeToMain(htmlText){
   writeToSection("mainContent", htmlText);
 }
+
+function appendToMain(htmlText){
+  appendToSection("mainContent", htmlText);
+}
+
 
 /* from https://stackoverflow.com/questions/10609511/javascript-url-parameter-parsing */
 var GetParams = (function () {
@@ -722,11 +1030,14 @@ async function openLocalFile(_filesObj, _fileCallback){
 
 /*
  * This is the callback of the file select widget. It parses the Connictro Blockchain credentials file
- * (accepting only single certificates) and calls a callback
+ * and calls a callback with the credentials components if it finds a single key only.
+ * If it finds multiple keys, it calls another callback with the entire array containing all the credentials.
+ * The caller can decide what to do with them.
+ *
  * "loginCredsSelectedAction" with the parsed credentials (clientKey, encHash, clientCertificate).
  * This callback must exist with that name since it cannot be passed as parameter.
- * Furthermore, a function "loginScreen" must exist with accepts an error message as parameter.
- * A global variable "gLanguage" must exist with the language setting.
+ * "loginCredsMultipleAction" which accepts a ListOfClientCredentials array must exist,
+ * since its name since it cannot be passed as parameter.
  */
 async function loginCredsSelected(_rawFileData){
   //console.log("Entering loginCredsSelected, _rawFileData: " + _rawFileData);
@@ -754,11 +1065,7 @@ async function loginCredsSelected(_rawFileData){
   }
 
   if (_credsRoot.ListOfClientCredentials.length > 1){
-    // selection of multiple keys not supported here. These are supported in the dashboard UI only, not in this demo.
-    var _errMsg = (gLanguage == "de") ?
-      "<h3>Mehrfach-Zertifikate werden in diese Demo nicht unterst&uuml;tzt!</h3>" :
-      "<h3>Multiple certificates are not supported in this demo!</h3>";
-    loginScreen(_errMsg);
+    loginCredsMultipleAction(_credsRoot.encHash, _credsRoot.ListOfClientCredentials);
   } else {
     var selectedCreds = _credsRoot.ListOfClientCredentials[0];
     loginCredsSelectedAction(selectedCreds.clientKey, _credsRoot.encHash, selectedCreds.clientCertificate);

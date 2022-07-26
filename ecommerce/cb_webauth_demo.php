@@ -162,6 +162,9 @@ function sendRequestedResource($resource, $res_size){
  */
 
 $requested_resource = getResource();
+if (empty($requested_resource)){
+  printErrorMessage("No resource specified (must give parameter \"?content=\" specifying your resource file)", 404); // will terminate and not deduct anything from voucher.
+}
 $requested_filesize = checkRequestedResource($requested_resource);
 if (!$requested_filesize){
   printErrorMessage("Requested resource not found.", 404); // will terminate and not deduct anything from voucher.

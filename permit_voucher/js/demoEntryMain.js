@@ -25,7 +25,6 @@
 "use strict";
 
 const gRedirectUrl = "https://www.connictro.de/bc-examples/cbdemo.php";
-var gLanguage;
 
 // Redraws demo-specific widgets
 function handleExampleSelect(){

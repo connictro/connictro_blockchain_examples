@@ -41,108 +41,13 @@
  */
 "use strict";
 
-const CHAIN_PORT_P = 58080;
-const CHAIN_PORT_A = 58081; // 58081 is the default port for A development chain (reset in Jan-Mar-May-Jul-Sep-Nov)
-const CHAIN_PORT_B = 58082; // For B development chain (reset Feb-Apr-Jun-Aug-Oct-Dec) set to 58082.
 
 const SIGNIFICANT_TIME_DIFF = 60000; // significant time deltas are minutes. We don't care about anything less than a minute.
 const exportFilenameBase = "Connictro_Blockchain_Example-Work_history_of_";
 
-
-const DEV_NODE_LIST = [
-        "https://node1.connictro-blockchain.de:",
-        "https://node2.connictro-blockchain.de:",
-        "https://node3.connictro-blockchain.de:"
-        ]
-const PROD_NODE_LIST = [
-        "https://node1.connictro-blockchain.de:",
-        "https://node2.connictro-blockchain.de:",
-        "https://node3.connictro-blockchain.de:",
-        "https://node4.connictro-blockchain.de:",
-        "https://node5.connictro-blockchain.de:"
-        ]
-
 const BALANCE_WARNING = 100;
-var gRandNode = null;
-var gShowingReport = false;
-var gLanguage;
 var gProjects;
 
-/*
- * This chooses a random blockchain node for some load balancing.
- * Until reloaded the node will stay the same.
- * Development service currently runs on 3 nodes.
- * Production service currently runs on 5 nodes.
- * Chain services development A/B and production run on these nodes but on different ports.
- */
-function chooseNode(_chain){
-  var _nodeList = (_chain == 'P' || _chain == 'p') ? PROD_NODE_LIST : DEV_NODE_LIST;
-  var _numNodes = _nodeList.length;
-  if (gRandNode == null){
-    gRandNode = Math.floor(Math.random() * _numNodes);
-  }
-  var _chainPort = (_chain == 'P' || _chain == 'p') ? CHAIN_PORT_P: ((_chain == 'a' || _chain == 'A') ? CHAIN_PORT_A: CHAIN_PORT_B);
-
-  return (_nodeList[gRandNode] + _chainPort);
-}
-
-function parseUrlParametersAndChooseNode(){
-  //console.log("Entering parseUrlParametersAndChooseNode");
-  var clientKeyParam = GetParams['k'];
-  var clientCertParam = GetParams['c'];
-  var encHashParam = GetParams['e'];
-  var devChain = GetParams['d'];
-  gLanguage = GetParams['l'];
-
-  if (clientKeyParam == undefined || clientCertParam == undefined || encHashParam == undefined || devChain == undefined){
-    var invalid_param_msg = (gLanguage == "de") ?
-                              "<h3>Ung&uuml;ltige Parameter</h3>Bitte angeben: d (Demo Blockchain A oder B), e (encHash), k (clientKey) und c (clientCertificate)!</h3>" :
-                              "<h3>Invalid Parameters</h3>Must specify d (chain A or B), e (encHash), k (clientKey) and c (clientCertificate)!</h3>";
-    writeToMain(invalid_param_msg);
-    return null;
-  }
-
-  var _chosenChain = null;
-  if (devChain != null && (devChain != 'a' && devChain != 'A')){
-    _chosenChain = 'B';
-  } else {
-    _chosenChain = 'A';
-  }
-  var chosenServer = chooseNode(_chosenChain);
-
-  var _signinCreds = {
-              clientKey: clientKeyParam,
-              clientCertificate: clientCertParam,
-              encHash: encHashParam,
-              server: chosenServer
-            }
-  //console.log("Leaving parseUrlParametersAndChooseNode");
-  return _signinCreds;
-}
-
-
-function mainMoDisplay(){
-  //console.log("Entering mainMoDisplay");
-  var _signinCreds = parseUrlParametersAndChooseNode();
-  if (_signinCreds == null) return;
-
-  var _ck = doSigninAndReadMo(printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);
-  if (_ck == null){
-    var unable_read_msg = (gLanguage == "de") ? "<h3>MO nicht zugreifbar!</h3>" : "<h3>Unable to read MO!</h3>";
-    writeToMain(unable_read_msg);
-  }
-  //console.log("Leaving mainMoDisplay");
-}
-
-function printMoFailure(){
-  var signinfail = (gLanguage == "de") ? "<h3>Fehler: Login fehlgeschlagen!</h3>" : "<h3>Error: Sign-in failed!</h3>";
-  writeToMain(signinfail);
-}
-
-function modifyMoFailure(){
-  var modifyfail = (gLanguage == "de") ? "<h3>Fehler: MO-&Auml;nderung fehlgeschlagen!</h3>" : "<h3>Error: MO change failed!</h3>";
-  writeToMain(modifyfail);
-}
 
 async function addProject(_ck){
   //console.log("Entering addProject");
@@ -157,6 +62,7 @@ async function addProject(_ck){
     }
   } catch(err) {
     // any error means no projects.
+    console.log("Ignoring customPayload \"" + _ck.moFields.customPayload + "\", not a valid JSON");
   }
 
   _projectsFileList.push(project_name);
@@ -164,7 +70,8 @@ async function addProject(_ck){
     ListOfProjects: _projectsFileList
   }
   var _serializedProjectsList = JSON.stringify(_projectsObj);
-  doModifyField("#waitMsg", "customPayload", _serializedProjectsList, mainMoDisplay, modifyMoFailure, _ck, gLanguage);
+  //console.log("New project list to add is: " + _serializedProjectsList);
+  doModifyField("#waitMsg", "customPayload", _serializedProjectsList, mainMoDisplayWithHistory, modifyMoFailure, _ck, gLanguage);
   //console.log("Leaving addProject");
 }
 
@@ -360,66 +267,8 @@ function handleStartStopBooking(processingWorker){
 function handleStartBooking(){ handleStartStopBooking(startBookingWorker); }
 function handleStopBooking() { handleStartStopBooking(stopBookingWorker);  }
 
-async function handleMoActivation(){
-  //console.log("Entering handleMoActivation");
-  var _signinCreds = parseUrlParametersAndChooseNode();
-  var activate_txrecord = (gLanguage == "de") ? "Demo MO-Aktivierung" : "Demo activate MO";
-
-  var _ck = doSigninConsumeAndReadMo("#waitMsg", "life", activate_txrecord, printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, gLanguage);
-  if (_ck == null){
-    var unable_status_msg = (gLanguage == "de") ? "<h3>Kann MO-Status nicht &auml;ndern!</h3>" : "<h3>Unable to change MO status!</h3>";
-    writeToMain(unable_status_msg);
-  } else {
-    $("#waitMsg").empty();
-  }
-  //console.log("Leaving handleMoActivation");
-}
-
 function displayReportButtons(){
-  //console.log("Entering displayReportButtons");
-  var _htmlReportButtons;
-  if (gShowingReport){
-    _htmlReportButtons = (gLanguage == "de") ?
-                          "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Auswertung aktualisieren</button>" +
-                          "<button id=\"hideReport\" type=\"submit\" name=\"hideReport\">Auswertung verstecken</button>" :
-                          "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Update report</button>" +
-                          "<button id=\"hideReport\" type=\"submit\" name=\"hideReport\">Hide report</button>";
-  } else {
-    _htmlReportButtons = (gLanguage == "de") ?
-                            "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Auswertung zeigen</button>" :
-                            "<button id=\"showReport\" type=\"submit\" name=\"showReport\">Show report</button>";
-  }
-  writeToSection("reportButtons", _htmlReportButtons);
-
-  $("#showReport").click(function (e) {
-    e.preventDefault();
-    handleUpdateReport();
-  });
-
-  $("#hideReport").click(function (e) {
-    e.preventDefault();
-    handleHideReport();
-  });
-  //console.log("Leaving displayReportButtons");
-}
-
-function handleHideReport(){
-  //console.log("Entering handleHideReport");
-  gShowingReport = false;
-  $("#reportSection").empty();
-  displayReportButtons();
-  //console.log("Leaving handleHideReport");
-}
-
-async function handleUpdateReport(){
-  //console.log("Entering handleUpdateReport");
-  var _signinCreds = parseUrlParametersAndChooseNode();
-  var _ck = doSigninAndReadMo(printReportTable, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);
-  if (_ck == null){
-    var unable_read_msg = (gLanguage == "de") ? "<h3>MO nicht zugreifbar!</h3>" : "<h3>Unable to read MO!</h3>";
-    writeToMain(unable_read_msg);
-  }
-  //console.log("Leaving handleUpdateReport");
+  handleDisplayHistoryButtons("showReport", "hideReport", "Auswertung", "report", "reportButtons", "reportSection", printReportTable, displayReportButtons);
 }
 
 async function extractReport(_ck, _assetname){
@@ -623,7 +472,7 @@ async function printReportTable(_ck){
   }
 
 
-  gShowingReport = true;
+  gShowingHistory = true;
   displayReportButtons();
   //console.log("Leaving printReportTable");
 }
@@ -734,7 +583,7 @@ async function printMoResult(_ck){
       }
 
       // Depleted objects should still be able to print the report. These just cannot book time anymore.
-      if (_state == 2 && _balance != null){
+      if (_state <= 2 && _balance != null){
         var depleted_booking_history;
         try {
           depleted_booking_history = await retrieveBookingHistory(_ck);
@@ -744,10 +593,6 @@ async function printMoResult(_ck){
         } catch (err){
           // any error means there are no valid bookings. The report buttons won't be displayed.
         }
-      }
-
-      if (_state == 1){
-        _htmlProjectActions += (gLanguage == "de") ? "<h3>Auswertung nicht mehr erlaubt!</h3>" : "<h3>Report not allowed anymore!</h3>"
       }
 
       var _htmlTimerSection = "";
@@ -762,8 +607,7 @@ async function printMoResult(_ck){
 
     writeToMain(_htmlFullMessage);
     if (_mustDisplayReportButtons){
-      displayReportButtons();
-      handleHideReport();
+      handleHideHistorySection("reportSection", displayReportButtons);
     }
   }
   //console.log("Signing out in the background (printMoResult)");
@@ -801,5 +645,5 @@ async function printMoResult(_ck){
 
 $(document).ready(function(){
     //console.log("Entering document ready function");
-    mainMoDisplay();
+    mainMoDisplayWithHistory();
   });

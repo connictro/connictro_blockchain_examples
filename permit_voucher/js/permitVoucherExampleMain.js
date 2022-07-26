@@ -35,164 +35,17 @@
  */
 "use strict";
 
-const CHAIN_PORT_A = 58081; // 58081 is the default port for A development chain (reset in Jan-Mar-May-Jul-Sep-Nov)
-const CHAIN_PORT_B = 58082; // For B development chain (reset Feb-Apr-Jun-Aug-Oct-Dec) set to 58082.
-                            // For production chain set to 58080 (not recommended for this demo as all data in production will be PERMANENT!).
-const DEV_NODE_LIST = [
-        "https://node1.connictro-blockchain.de:",
-        "https://node2.connictro-blockchain.de:",
-        "https://node3.connictro-blockchain.de:"
-        ]
-var gRandNode = null;
-var gShowingHistory = false;
-var gLanguage;
-
-/*
- * This chooses a random blockchain node for some load balancing.
- * Until reloaded the node will stay the same.
- * Development service currently runs on 3 nodes.
- * Chains A and B both run on these nodes but on different ports.
- */
-function chooseNode(_chain){
-  var _numNodes = DEV_NODE_LIST.length;
-  if (gRandNode == null){
-    gRandNode = Math.floor(Math.random() * _numNodes);
-  }
-  var _chainPort = (_chain == 'a' || _chain == 'A') ? CHAIN_PORT_A: CHAIN_PORT_B;
-  return (DEV_NODE_LIST[gRandNode] + _chainPort);
-}
-
-function parseUrlParametersAndChooseNode(){
-  //console.log("Entering parseUrlParametersAndChooseNode");
-  var clientKeyParam = GetParams['k'];
-  var clientCertParam = GetParams['c'];
-  var encHashParam = GetParams['e'];
-  var devChain = GetParams['d'];
-  gLanguage = GetParams['l'];
-
-  if (clientKeyParam == undefined || clientCertParam == undefined || encHashParam == undefined || devChain == undefined){
-    var invalid_param_msg = (gLanguage == "de") ?
-                              "<h3>Ung&uuml;ltige Parameter</h3>Bitte angeben: d (Demo Blockchain A oder B), e (encHash), k (clientKey) und c (clientCertificate)!</h3>" :
-                              "<h3>Invalid Parameters</h3>Must specify d (chain A or B), e (encHash), k (clientKey) and c (clientCertificate)!</h3>";
-    writeToMain(invalid_param_msg);
-    return null;
-  }
-
-  var _chosenChain = null;
-  if (devChain != null && (devChain != 'a' && devChain != 'A')){
-    _chosenChain = 'B';
-  } else {
-    _chosenChain = 'A';
-  }
-  var chosenServer = chooseNode(_chosenChain);
-
-  var _signinCreds = {
-              clientKey: clientKeyParam,
-              clientCertificate: clientCertParam,
-              encHash: encHashParam,
-              server: chosenServer
-            }
-  //console.log("Leaving parseUrlParametersAndChooseNode");
-  return _signinCreds;
-}
-
-
-function mainMoDisplay(){
-  //console.log("Entering mainMoDisplay");
-  var _signinCreds = parseUrlParametersAndChooseNode();
-  if (_signinCreds == null) return;
-
-  var _ck = doSigninAndReadMo(printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, false);
-  if (_ck == null){
-    var unable_read_msg = (gLanguage == "de") ? "<h3>MO nicht zugreifbar!</h3>" : "<h3>Unable to read MO!</h3>";
-    writeToMain(unable_read_msg);
-  }
-  //console.log("Leaving mainMoDisplay");
-}
-
-function printMoFailure(){
-  var signinfail = (gLanguage == "de") ? "<h3>Fehler: Login fehlgeschlagen!</h3>" : "<h3>Error: Sign-in failed!</h3>";
-  writeToMain(signinfail);
-}
-
 async function handleDecrementDemo(){
   //console.log("Entering handleDecrementDemo");
   var _signinCreds = parseUrlParametersAndChooseNode();
-
   var _txRecord = $('#txRecord').val();
-  var _ck = doSigninConsumeAndReadMo("#waitMsg", "value", _txRecord, printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, gLanguage);
-  if (_ck == null){
-    var unable_deduct_msg = (gLanguage == "de") ? "<h3>Kann MO-Wert nicht vermindern!</h3>" : "<h3>Unable to deduct value from MO!</h3>";
-    writeToMain(unable_deduct_msg);
-  } else {
-    $("#waitMsg").empty();
-  }
-  await doSignout(_ck);
+  var _ck = await doSigninConsumeAndReadMo("#waitMsg", "value", _txRecord, printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, gLanguage);
+  handleHideHistorySection("historyArea", displayHistoryButtons);
   //console.log("Leaving handleDecrementDemo");
 }
 
-async function handleMoActivation(){
-  //console.log("Entering handleMoActivation");
-  var _signinCreds = parseUrlParametersAndChooseNode();
-  var activate_txrecord = (gLanguage == "de") ? "Demo MO-Aktivierung" : "Demo activate MO";
-
-  var _ck = doSigninConsumeAndReadMo("#waitMsg", "life", activate_txrecord, printMoResult, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, gLanguage);
-  if (_ck == null){
-    var unable_status_msg = (gLanguage == "de") ? "<h3>Kann MO-Status nicht &auml;ndern!</h3>" : "<h3>Unable to change MO status!</h3>";
-    writeToMain(unable_status_msg);
-  } else {
-    $("#waitMsg").empty();
-  }
-  await doSignout(_ck);
-  //console.log("Leaving handleMoActivation");
-}
-
 function displayHistoryButtons(){
-  //console.log("Entering displayHistoryButtons");
-  var _htmlHistoryButtons;
-  if (gShowingHistory){
-    _htmlHistoryButtons = (gLanguage == "de") ?
-                          "<button id=\"showHistory\" type=\"submit\" name=\"showHistory\">Verlauf aktualisieren</button>" +
-                          "<button id=\"hideHistory\" type=\"submit\" name=\"hideHistory\">Verlauf verstecken</button>" :
-                          "<button id=\"showHistory\" type=\"submit\" name=\"showHistory\">Update history</button>" +
-                          "<button id=\"hideHistory\" type=\"submit\" name=\"hideHistory\">Hide history</button>";
-  } else {
-    _htmlHistoryButtons = (gLanguage == "de") ?
-                            "<button id=\"showHistory\" type=\"submit\" name=\"showHistory\">Verlauf zeigen</button>" :
-                            "<button id=\"showHistory\" type=\"submit\" name=\"showHistory\">Show history</button>";
-  }
-  writeToSection("historyButtons", _htmlHistoryButtons);
-
-  $("#showHistory").click(function (e) {
-    e.preventDefault();
-    handleUpdateHistory();
-  });
-
-  $("#hideHistory").click(function (e) {
-    e.preventDefault();
-    handleHideHistory();
-  });
-  //console.log("Leaving displayHistoryButtons");
-}
-
-function handleHideHistory(){
-  //console.log("Entering handleHideHistory");
-  gShowingHistory = false;
-  $("#historyArea").empty();
-  displayHistoryButtons();
-  //console.log("Leaving handleHideHistory");
-}
-
-async function handleUpdateHistory(){
-  //console.log("Entering handleUpdateHistory");
-  var _signinCreds = parseUrlParametersAndChooseNode();
-
-  var _ck = doSigninAndReadMo(printMoValueHistory, printMoFailure, _signinCreds.server, _signinCreds.clientKey, _signinCreds.encHash,  _signinCreds.clientCertificate, true);
-  if (_ck == null){
-    var unable_read_msg = (gLanguage == "de") ? "<h3>MO nicht zugreifbar!</h3>" : "<h3>Unable to read MO!</h3>";
-    writeToMain(unable_read_msg);
-  }
-  //console.log("Leaving handleUpdateHistory");
+  handleDisplayHistoryButtons("showHistory", "hideHistory", "Verlauf", "history", "historyButtons", "historyArea", printMoValueHistory, displayHistoryButtons);
 }
 
 async function printMoValueHistory(_ck){
@@ -300,6 +153,6 @@ async function printMoResult(_ck){
 
 $(document).ready(function(){
     //console.log("Entering document ready function");
-    mainMoDisplay(false);
+    mainMoDisplayWOHistory();
   });
 
