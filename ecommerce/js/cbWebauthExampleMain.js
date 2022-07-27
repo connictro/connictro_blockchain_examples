@@ -43,6 +43,7 @@ var mCookieContent;
 var mResourceParam;
 var mEncHash;
 var mSelectedCredsArray;
+var mSelectedSignInActive = false;
 
 
 function parseUrlParametersWebauth(){
@@ -106,6 +107,22 @@ function goodLoginCallback(_newCredentials){
   location.assign(newUrl);
 }
 
+function handleCookieConsent(){
+  //console.log("Entering handleCookieConsent");
+  var consent_granted = $('#cookieConsent').prop('checked');
+  document.getElementById("loadCreds").disabled = !consent_granted;
+
+  var multi_picker_id = document.getElementById("signInKeyPicker");
+  if (multi_picker_id != null){
+    multi_picker_id.disabled = !consent_granted;
+
+    if (mSelectedSignInActive){
+      document.getElementById("selectedSignIn").disabled = !consent_granted;
+    }
+  }
+  //console.log("Entering handleCookieConsent");
+}
+
 function handleMultiCredsSelection(){
   //console.log("Entering handleMultiCredsSelection");
   var _clientCertificate = "";
@@ -123,21 +140,30 @@ function handleMultiCredsSelection(){
 function loginScreen(_errMsg){
   var _demo_signinpage = (_errMsg ? _errMsg : "");
 
-  _demo_signinpage += (gLanguage == "de") ?
-    "<h3>Web Authentisierung - Demo f&uuml;r gesch&uuml;tzte Inhalte</h3>" +
-    "<b>Einloggen mittels Zertifikatsdatei:</b>&nbsp;" +
-    "<input type=\"file\" id=\"loadCreds\" />"
-     :
-    "<h3>Web authentication - protected content demo</h3>" +
-    "Sign in using certificate file:&nbsp;" +
-    "<input type=\"file\" id=\"loadCreds\" />" ;
+  var demo_title_text = (gLanguage == "de") ? "Web Authentisierung - Demo f&uuml;r gesch&uuml;tzte Inhalte" : "Web authentication - protected content demo";
+  var demo_signin_text = (gLanguage == "de") ? "Einloggen mittels Zertifikatsdatei" : "Sign in using certificate file";
+  var demo_cookie_consent_text = (gLanguage == "de") ? "Zustimmung zu technisch notwendigen Cookies erteilen" : "Consent to technically necessary cookies";
+  var demo_cookie_notrackinfo = (gLanguage == "de") ?
+      "(Nur das geladene Zertifikat wird im Cookie gespeichert - Wir setzen keine Tracking-Mechanismen ein!)" :
+      "(Only the loaded certificate will be stored in the cookie - We're not using any tracking mechanisms!)";
+
+  _demo_signinpage +=
+    "<h3>" + demo_title_text + "</h3>" +
+    "<b>" + demo_cookie_consent_text + ":</b>&nbsp;<input type=\"checkbox\" id=\"cookieConsent\">&nbsp;&nbsp;" +
+    demo_cookie_notrackinfo + "<br><br>" +
+    "<b>" + demo_signin_text + ":</b>&nbsp;" +
+    "<input type=\"file\" id=\"loadCreds\" />";
   _demo_signinpage += "<div id=\"selectMultiCreds\"></div>"
   writeToMain(_demo_signinpage);
+  document.getElementById("loadCreds").disabled = true;
 
   // As callback for the file selector use loginCredsSelected().
   $("#loadCreds").on('change', function (e) {
     //console.log("in eventlistener for file open button");
     openLocalFile(e.target.files, loginCredsSelected);
+  });
+  $("#cookieConsent").click(function (e) {
+    handleCookieConsent();
   });
 }
 
@@ -165,6 +191,7 @@ function loginCredsMultipleAction(_encHash, _selectedCredsArray){
 
   $("#signInKeyPicker").on('change', function (e) {
     document.getElementById("selectedSignIn").disabled = false;
+    mSelectedSignInActive = true;
   });
 
   $("#selectedSignIn").click(function (e) {

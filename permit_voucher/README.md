@@ -3,35 +3,6 @@
 This is an example to demonstrate usage of the Connictro Blockchain platform for the use cases
 "Time-limited Access Permit" and "Voucher".
 
-## Short Overview of Connictro Blockchain
-Connictro Blockchain is based on Managed Objects (MOs) like an account in a database, or a wallet
-in a cryptocurrency (NOTE: Connictro Blockchain is NOT a cryptocurrency!). MOs are stored in the blockchain.
-Names are completely random to support usage in data privacy-friendly applications. No personal data -
-like e-mail address, phone number, credit card number etc. is needed. 
-
-Each MO consists of fields (from simple text fields of up to 4KB, to fields controlling MO behaviour),
-and assets (similar to "money" or "fuel"). End user assets (the digital twin of a permit or voucher) can
-only be consumed, never transferred to others.
-The most important (and predefined) assets are "life" (mandatory) and "value" (optional).
-
-"Life" models the state of the MO (counting down from 7 to 0; states may be skipped).
-
-7 - New/Created - the MO exists in the blockchain but it can not yet be used - it must be provisioned 
-                  by a licensee (or timer) first to enable it for usage.
-                  
-6 - Provisioned - the MO can now be used. Next deduction of "Life" advances state directly to "In Use",
-                  unless validation or pairing has been defined.
-                                    
-(See Licensee manual for description of "5 - Wait Validation" and "4 - Wait Pairing" states)
-    
-3 - In Use      - In this state the MO is valid and "value" asset can be used (if defined)
-
-2 - Depleted    - Either all "value" has been consumed or a timer expired.
-
-(See Licensee manual for description of "1 - Returned" and "0 - Invalid" states)
- 
-If required by the use case, "Value" models the supply of whatever you define it should be (points, credits, ...). 
-
 ### Permit example
 "Permits" are MOs populated only with "Life", no "Value". After creation they are in state "7 - New/Created", 
 and 2 timers are created as well. One causes a state transition to "3 - In Use" (start timer) and another a
@@ -42,7 +13,7 @@ In real life, this would model a permit like a concert ticket, or tenant parking
 ### Voucher example
 "Vouchers" are MOs populated with both "Life" and "Value". In real life these are used to model consumption of a
 device's consumable (being a digital twin of the consumable product like a printer cartridge), or as voucher to
-purchase services, download news articles etc.
+purchase services, download news articles etc. See also the "e-commerce" example.
 Each consumption can be accompanied by a transaction record which is stored in the blockchain. Therefore, in use
 cases only requiring trusted storage of tracking data (e.g. temperature, GPS location etc.), "Value" is required but
 actually not used to model credit balance. There just needs to be sufficient supply to accommodate all expected
@@ -55,8 +26,9 @@ a small subset of the platform's capabilities.
 
 ## Free demo without registration
 The Connictro homepage links to a pre-defined "Permit/Voucher" demo with limited supply and validity, using the same
-code as in this repository. This does not require any installation. However to see the full platform capability,
-it is recommended to install the components as described in the next section.
+code as in this repository. This does not require any installation or registration for the SaaS service (even not
+for Free Trial). However to see the full platform capability, it is recommended to install the components as described
+in the next section.
 
 ## Installation
 1. Sign up for a Connictro Blockchain Trial (or commercial) license. You'll receive credentials for production and
@@ -89,6 +61,8 @@ it is recommended to install the components as described in the next section.
      $chain = "A";    (or $chain = "B";)
      ```
 6. Save cbdemo.php.
+
+Please note that this also installs common modules other examples depend upon.
 
 ## Running the demo
 Call [your server URL]/[your example subdirectory]/demoEntry.html.
